@@ -268,7 +268,7 @@ legend_block = paste(
   ", unanswered:", unanswered, " (", round(unanswered / n * 100), "%)", 
   sep = "");
 
-print(legend_block);
+print(legend_block)
 
 ```
 
