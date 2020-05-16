@@ -250,7 +250,7 @@ We should thus enrich our graph with the total percentages per function.
 n2 = sum(option_count);
 function_percentages = sort(option_count, decreasing = TRUE);
 function_percentages = round(function_percentages / n2 * 100);
-data.frame(Percentage = function_percentages);
+knitr::kable(data.frame(Percentage = function_percentages));
 ```
 
 ## Sample and answer rate
@@ -268,7 +268,7 @@ legend_block = paste(
   ", unanswered:", unanswered, " (", round(unanswered / n * 100), "%)", 
   sep = "");
 
-legend_block
+print(legend_block);
 
 ```
 
