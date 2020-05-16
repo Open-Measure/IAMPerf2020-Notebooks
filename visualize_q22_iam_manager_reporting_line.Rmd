@@ -36,7 +36,7 @@ When the survey participant selected the **Other* option, he could type in the o
 
 To conduct this data analysis, we first need to setup our technical environment.
 
-```{r echo=TRUE}
+```{r echo=TRUE, message=FALSE}
 # Set console to English
 Sys.setenv(LANG = "en");
 
@@ -47,6 +47,7 @@ if(!require("RCurl")) install.packages("RCurl");
 if(!require("plyr")) install.packages("plyr");
 if(!require("gridExtra")) install.packages("gridExtra");
 if(!require("grid")) install.packages("grid");
+if(!require("knitr")) install.packages("knitr");
 
 # Load libraries
 library(eulerr);
@@ -55,6 +56,7 @@ library(RCurl);
 library(plyr);
 library(gridExtra);
 library(grid);
+library(knitr);
 ```
 
 ## Retrieve the data
@@ -99,17 +101,7 @@ question_data = data.frame(
 # Note: in the survey data, column Q22A7 is the "I don't know" option.
 # We discard it here on purpose as "NA".
 
-#install.packages("htmlTable")
-#require(htmlTable)
-#c_html=htmlTable(head(question_data), escape.html=FALSE)
-#c_html
-#pander::pandoc.table(head(question_data))
 knitr::kable(head(question_data))
-
-#grid.newpage();
-#g = gridExtra::tableGrob(head(question_data));
-#grid::grid.draw(g);
-#print("hello")
 ```
 
 As we can see, we have a table structure with one row per survey answer and one column per selectable option. When the option was selected by the participant, it takes value 1 and N/A otherwise.
@@ -131,7 +123,7 @@ option_count = c(
   Other = sum(!is.na(question_data$Other))
   );
 
-data.frame(t(sort(option_count, decreasing = TRUE)));
+knitr::kable(data.frame(t(sort(option_count, decreasing = TRUE))));
 ```
 
 We immediately spot the high frequency of the CISO reporting line, followed by the CIO. 
@@ -153,7 +145,7 @@ To do this, we should count every *unique* combination of selected options.
 # and appends the freq column (# of occurences).
 question_flat = data.frame(plyr::count(question_data));
 
-question_flat[order(question_flat$freq, decreasing = TRUE),];
+knitr::kable(question_flat[order(question_flat$freq, decreasing = TRUE),]);
 
 ```
 
@@ -209,7 +201,7 @@ question_flat$friendly_label = ifelse(
   );
 
 # All this work to get this simple representation:
-question_flat[order(question_flat$freq, decreasing = TRUE),][,c("technical_label", "friendly_label", "freq")];
+knitr::kable(question_flat[order(question_flat$freq, decreasing = TRUE),][,c("technical_label", "friendly_label", "freq")]);
 
 ```
 
