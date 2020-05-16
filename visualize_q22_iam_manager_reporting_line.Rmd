@@ -92,8 +92,7 @@ question_data = data.frame(
 # Note: in the survey data, column Q22A7 is the "I don't know" option.
 # We discard it here on purpose as "NA".
 
-head(question_data);
-
+head(question_data)
 ```
 
 ## Basic counting
