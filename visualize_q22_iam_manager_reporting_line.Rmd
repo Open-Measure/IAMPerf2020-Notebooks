@@ -109,6 +109,9 @@ Note that options are not exclusive. In consequence we may find both single-valu
 Let's count how many times every option was selected, independently on whether the options come from single-valued answers or multi-valued answers.
 
 ```{r echo=TRUE}
+# Some basic stats.
+n = nrow(question_data)
+
 # We may use the sum function because a selected option correspond to a value of 1.
 option_count = c(
   CFO = sum(!is.na(question_data$CFO)),
@@ -140,6 +143,10 @@ To do this, we should count every *unique* combination of selected options.
 # The plyr count function does all of this in a single shot,
 # and appends the freq column (# of occurences).
 question_flat = data.frame(plyr::count(question_data));
+
+# Basic stats.
+answered = sum(question_flat$freq[question_flat$option_count != 0]);
+unanswered = sum(question_flat$freq[question_flat$option_count == 0]);
 
 knitr::kable(question_flat[order(question_flat$freq, decreasing = TRUE),]);
 
@@ -243,10 +250,10 @@ It should be noted that percentages appearing on the Euler chart may be misleadi
 We should thus enrich our graph with the total percentages per function.
 
 ```{r}
-n2 = sum(option_count);
 function_percentages = sort(option_count, decreasing = TRUE);
-function_percentages = round(function_percentages / n2 * 100);
-knitr::kable(data.frame(Percentage = function_percentages));
+function_percentages = function_percentages / answered * 100;
+function_percentages = c(function_percentages, Total = sum(function_percentages));
+knitr::kable(data.frame(Percentage = function_percentages), digits = 1);
 ```
 
 ## Sample and answer rate
@@ -255,9 +262,6 @@ And finally we should accompany the graph with information on the sample and ans
 
 ```{r echo=TRUE}
 # Prepare a legend to inform on the sample size and answer rate.
-n = nrow(question_data)
-answered = sum(question_flat$freq[question_flat$option_count != 0]);
-unanswered = sum(question_flat$freq[question_flat$option_count == 0]);
 legend_block = paste(
   "n: ", n,
   ", answered: ", answered, " (", round(answered / n * 100), "%)",
