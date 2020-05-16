@@ -1,19 +1,17 @@
 ---
-title: "The reporting lines of the IAM Manager"
-output: html_notebook
+title: "Visualizing the reporting lines of the IAM Manager with a Euler chart"
+output: 
+  html_notebook: 
+    toc: yes
 ---
 
-# In a nutshell
+## In a nutshell
 
-This notebook uses an Euler chart to visualize the reporting lines of IAM managers.
-
-# The data analysis
+This R notebook uses an Euler chart to visualize the reporting lines of IAM managers.
 
 ## Introduction
 
-As part of the *IAM Performance Measurement 2020 Survey*, I surveyed IAM professionals about the reporting lines IAM managers in their organization.  
-
-In this data analysis notebook, we will use R to analyse and visualize the answers to this question.
+As part of the *IAM Performance Measurement 2020 Survey*, I surveyed IAM professionals about the reporting lines IAM managers in their organization. In this data analysis notebook, I use R to analyse and visualize the answers to this question.
 
 The original survey question #22 was:
 
@@ -29,13 +27,16 @@ The non-exclusive possible answers were:
 * Other
 * I don't know
 
-When the survey participant selected the **Other* option, he could type in the other function name. In this notebook, we will *not* analyse the answers provided in free text form.
+When the survey participant selected the **Other* option, he could type in the other function name. In this notebook, I will *not* analyse the answers provided in free text form.
 
-## Let's get started
+## Setting up the technical environment
 
 To conduct this data analysis, we first need to setup our technical environment.
 
 ```{r echo=TRUE}
+# Set console to English
+Sys.setenv(LANG = "en");
+
 # Install R packages as needed
 if(!require("eulerr")) install.packages("eulerr");
 if(!require("tidyr")) install.packages("tidyr");
@@ -51,7 +52,7 @@ library(plyr);
 
 ## Retrieve the data
 
-Then we need to retrieve our data. 
+Then we need to load the survey data. In accordance with the *Open Source* and *Open Data* spirit of the *Open-Measure* project, all data is publicly available on GitHub.
 
 ```{r echo=TRUE}
 # Configuration options
