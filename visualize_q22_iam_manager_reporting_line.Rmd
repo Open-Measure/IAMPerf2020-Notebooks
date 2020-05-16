@@ -256,6 +256,8 @@ function_percentages = c(function_percentages, Total = sum(function_percentages)
 knitr::kable(data.frame(Percentage = function_percentages), digits = 1);
 ```
 
+It may surprise that the total percentage is greater than 100% but this is explained by multi-valued answers that account in several categories.
+
 ## Sample and answer rate
 
 And finally we should accompany the graph with information on the sample and answer rate.
