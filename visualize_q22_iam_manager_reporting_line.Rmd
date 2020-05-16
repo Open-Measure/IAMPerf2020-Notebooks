@@ -1,0 +1,269 @@
+---
+title: "The reporting lines of the IAM Manager"
+output: html_notebook
+---
+
+# In a nutshell
+
+This notebook uses an Euler chart to visualize the reporting lines of IAM managers.
+
+# The data analysis
+
+## Introduction
+
+As part of the *IAM Performance Measurement 2020 Survey*, I surveyed IAM professionals about the reporting lines IAM managers in their organization.  
+
+In this data analysis notebook, we will use R to analyse and visualize the answers to this question.
+
+The original survey question #22 was:
+
+> To whom reports the IAM manager in your organization?
+
+The non-exclusive possible answers were:
+
+* CFO
+* CISO
+* CIO
+* COO
+* CEO
+* Other
+* I don't know
+
+When the survey participant selected the **Other* option, he could type in the other function name. In this notebook, we will *not* analyse the answers provided in free text form.
+
+## Let's get started
+
+To conduct this data analysis, we first need to setup our technical environment.
+
+```{r echo=TRUE}
+# Install R packages as needed
+if(!require("eulerr")) install.packages("eulerr");
+if(!require("tidyr")) install.packages("tidyr");
+if(!require("RCurl")) install.packages("RCurl");
+if(!require("plyr")) install.packages("plyr");
+
+# Load libraries
+library(eulerr);
+library(tidyr);
+library(RCurl);
+library(plyr);
+```
+
+## Retrieve the data
+
+Then we need to retrieve our data. 
+
+```{r echo=TRUE}
+# Configuration options
+survey_url = "https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/IAMPerf2020.csv";
+question_number = 22;
+
+# Download the survey data from GitHub
+survey_raw <- RCurl::getURL(survey_url);
+
+# Interpret the CSV to get structured data
+survey_data <- read.csv (text = survey_raw);
+
+# In the original survey data, 
+# we are interested in question 22: Reporting line of the line manager.
+# The column names corresponding to the question options are prefixed with Q22.
+# The column names of the options ("CFO", "CISO", ...) are suffixed with Ax.
+# Here is the mapping table:
+# Q22A1: CFO
+# Q22A2: CISO
+# Q22A3: CIO
+# Q22A4: COO
+# Q22A5: CEO
+# Q22A6: Other
+# Q22A7: I don't know
+
+# Pick only the columns we are interested in,
+# and rename columns to friendly names in the process.
+question_data = data.frame(
+  CFO = survey_data$Q22A1,
+  CISO = survey_data$Q22A2,
+  CIO = survey_data$Q22A3,
+  COO = survey_data$Q22A4,
+  CEO = survey_data$Q22A5,
+  Other = survey_data$Q22A6
+);
+
+# Note: in the survey data, column Q22A7 is the "I don't know" option.
+# We discard it here on purpose as "NA".
+
+head(question_data);
+
+```
+
+## Basic counting
+
+As we can see, we have a table structure with one row per survey answer and one column per selectable option. When the option was selected by the participant, it takes value 1 and N/A otherwise.
+
+Note that options are not exclusive. In consequence we may find both single-valued answers and multi-valued answers.
+
+First, let's count how many times every option was selected, independently on whether the options come from single-valued answers or multi-valued answers.
+
+```{r echo=TRUE}
+# We may use the sum function because a selected option correspond to a value of 1.
+option_count = c(
+  CFO = sum(!is.na(question_data$CFO)),
+  CISO = sum(!is.na(question_data$CISO)),
+  CIO = sum(!is.na(question_data$CIO)),
+  COO = sum(!is.na(question_data$COO)),
+  CEO = sum(!is.na(question_data$CEO)),
+  Other = sum(!is.na(question_data$Other))
+  );
+
+data.frame(t(sort(option_count, decreasing = TRUE)));
+```
+
+We immediately spot the high frequency of the CISO reporting line, followed by the CIO. 
+
+## Introducing the Euler chart
+
+We could stop the analysis here and output a bar or pie chart but this would hide an interesting aspect of our data: multi-valued answers. To overcome this limitation, we will use a different visualization: an **Euler chart**. This visualization will show the relative importance of individual options by the size of its bubbles but will also display the multi-valued answers as interesections between bubbles.
+
+To do this, we should count every *unique* combination of selected options.
+
+```{r echo=TRUE}
+# The question options in the survey are non-exclusive,
+# thus we need to keep track of all combinations (e.g. CISO + CIO).
+# What we really need is to count both multiple value answers (e.g. CISO + CIO)
+# and and single value answers (e.g. CISO).
+# To accomplish this, reduce the table to its unique row combinations (e.g. CISO + CIO).
+# And count the occurrences of these combinations.
+# The plyr count function does all of this in a single shot,
+# and appends the freq column (# of occurences).
+question_flat = data.frame(plyr::count(question_data));
+
+question_flat[order(question_flat$freq, decreasing = TRUE),];
+
+```
+
+## Labeling
+
+In our Euler graph, we wish to label bubbles with the title of the selected options, but we will not label intersections. In effect, intersections are self-explanatory (this is the whole visual value of Euler graphs). But to generate the Euler graph, we still need to keep track of these intersections.
+
+So let's label our data.
+
+```{r echo=TRUE}
+
+# Count the number of selected options per answer (ie row).
+# This will help us distinguish between single-valued and multi-valued answers.
+# We couldn't sum directly all columns because the freq column is now present.
+question_flat$option_count =
+  tidyr::replace_na(question_flat$CFO, 0) +
+  tidyr::replace_na(question_flat$CISO, 0) +
+  tidyr::replace_na(question_flat$CIO, 0) +
+  tidyr::replace_na(question_flat$COO, 0) +
+  tidyr::replace_na(question_flat$CEO, 0) +
+  tidyr::replace_na(question_flat$Other, 0);
+
+# To facilitate concatenation, prepare columns with strings.
+question_flat$CFO_text = ifelse(question_flat$CFO == 1, "CFO", NA);
+question_flat$CISO_text = ifelse(question_flat$CISO == 1, "CISO", NA);
+question_flat$CIO_text = ifelse(question_flat$CIO == 1, "CIO", NA);
+question_flat$COO_text = ifelse(question_flat$COO == 1, "COO", NA);
+question_flat$CEO_text = ifelse(question_flat$CEO == 1, "CEO", NA);
+question_flat$Other_text = ifelse(question_flat$Other == 1, "Other", NA);
+
+# Declare a utility function to perform the paste operation
+# on a vector (here it will be rows) while discarding NAs in the process.
+get_technical_label = function(some_vector, sep = "") {
+  some_vector = some_vector[!is.na(some_vector)];
+  some_vector = base::paste(some_vector, collapse = sep);
+  return(some_vector);
+};
+
+# Multi-value concatenations.
+# The euler uses a naming convention
+# where bubble names are listed and separated by "&", e.g. "A&B",
+# to designate set intersections.
+question_flat$technical_label = apply(
+  question_flat[,c("CFO_text","CISO_text","CIO_text","COO_text","CEO_text","Other_text")], 
+  1, 
+  get_technical_label, "&");
+
+# To populate human friendly readable labels, we only keep the single-valued ones.
+question_flat$friendly_label = ifelse(
+  question_flat$option_count == 1, 
+  question_flat$technical_label, # A single-valued label.
+  "" # A blank label.
+  );
+
+# All this work to get this simple representation:
+question_flat[order(question_flat$freq, decreasing = TRUE),][,c("technical_label", "friendly_label", "freq")];
+
+```
+
+## Plotting
+
+And finally, we may plot the Euler chart.
+
+```{r echo=TRUE}
+
+# Remove entries with no selected option
+euler_data = question_flat$freq[question_flat$option_count != 0];
+names(euler_data) = question_flat$technical_label[question_flat$option_count != 0];
+euler_labels = question_flat$friendly_label[question_flat$option_count != 0];
+
+# Keep a basic sample handily available to see how intersections are accounted for
+# because we do not want to double-count entries.
+# euler_data = c(100, 100, 100)
+# names(euler_data) = c("A", "A&B", "B")
+
+# Transform our data in the object class required by the eulerr package.
+eulerr_object = eulerr::euler(euler_data)
+
+# Some branding
+palette = c("#0066ff", "#dddddd", "#dddddd", "#5599ff", "#5599ff");
+
+# And now we may draw our Euler chart
+plot(
+  eulerr_object,
+  #labels = euler_labels,
+  fills = palette,
+  edges = TRUE,
+  quantities = list(fontsize = 24, cex = .5, type = "percent"),
+  alpha = 0.7,
+  main = "The reporting lines of the IAM manager"
+  );
+
+```
+
+## Percentages per function
+
+It should be noted that percentages appearing on the Euler chart may be misleading for newbies. In effect, you must add the single-valued answers with the multi-valued answers to get the full percentage per function.
+
+We should thus enrich our graph with the total percentages per function.
+
+```{r}
+n2 = sum(option_count);
+function_percentages = sort(option_count, decreasing = TRUE);
+function_percentages = round(function_percentages / n2 * 100);
+data.frame(Percentage = function_percentages);
+```
+
+## Sample and answer rate
+
+And finally we should accompany the graph with information on the sample and answer rate.
+
+```{r echo=TRUE}
+# Prepare a legend to inform on the sample size and answer rate.
+n = nrow(question_data)
+answered = sum(question_flat$freq[question_flat$option_count != 0]);
+unanswered = sum(question_flat$freq[question_flat$option_count == 0]);
+legend_block = paste(
+  "n: ", n,
+  ", answered: ", answered, " (", round(answered / n * 100), "%)",
+  ", unanswered:", unanswered, " (", round(unanswered / n * 100), "%)", 
+  sep = "");
+
+legend_block
+
+```
+
+# References
+
+* https://cran.r-project.org/web/packages/eulerr/vignettes/visualization.html
+* https://stackoverflow.com/questions/46044564/customizing-euler-diagram-colors-with-eulerr-r
