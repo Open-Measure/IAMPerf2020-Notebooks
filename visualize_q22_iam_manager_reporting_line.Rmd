@@ -2,7 +2,7 @@
 title: "Visualizing the reporting lines of the IAM Manager with a Euler chart"
 output: 
   html_document: 
-    df_print: tibble
+    df_print: default
     toc: yes
   html_notebook: 
     toc: yes
@@ -45,12 +45,16 @@ if(!require("eulerr")) install.packages("eulerr");
 if(!require("tidyr")) install.packages("tidyr");
 if(!require("RCurl")) install.packages("RCurl");
 if(!require("plyr")) install.packages("plyr");
+if(!require("gridExtra")) install.packages("gridExtra");
+if(!require("grid")) install.packages("grid");
 
 # Load libraries
 library(eulerr);
 library(tidyr);
 library(RCurl);
 library(plyr);
+library(gridExtra);
+library(grid);
 ```
 
 ## Retrieve the data
@@ -95,16 +99,26 @@ question_data = data.frame(
 # Note: in the survey data, column Q22A7 is the "I don't know" option.
 # We discard it here on purpose as "NA".
 
-head(question_data)
-```
+#install.packages("htmlTable")
+#require(htmlTable)
+#c_html=htmlTable(head(question_data), escape.html=FALSE)
+#c_html
+#pander::pandoc.table(head(question_data))
+knitr::kable(head(question_data))
 
-## Basic counting
+#grid.newpage();
+#g = gridExtra::tableGrob(head(question_data));
+#grid::grid.draw(g);
+#print("hello")
+```
 
 As we can see, we have a table structure with one row per survey answer and one column per selectable option. When the option was selected by the participant, it takes value 1 and N/A otherwise.
 
 Note that options are not exclusive. In consequence we may find both single-valued answers and multi-valued answers.
 
-First, let's count how many times every option was selected, independently on whether the options come from single-valued answers or multi-valued answers.
+## Basic counting
+
+Let's count how many times every option was selected, independently on whether the options come from single-valued answers or multi-valued answers.
 
 ```{r echo=TRUE}
 # We may use the sum function because a selected option correspond to a value of 1.
