@@ -45,8 +45,6 @@ if(!require("eulerr")) install.packages("eulerr");
 if(!require("tidyr")) install.packages("tidyr");
 if(!require("RCurl")) install.packages("RCurl");
 if(!require("plyr")) install.packages("plyr");
-if(!require("gridExtra")) install.packages("gridExtra");
-if(!require("grid")) install.packages("grid");
 if(!require("knitr")) install.packages("knitr");
 
 # Load libraries
@@ -54,8 +52,6 @@ library(eulerr);
 library(tidyr);
 library(RCurl);
 library(plyr);
-library(gridExtra);
-library(grid);
 library(knitr);
 ```
 
