@@ -2,7 +2,7 @@
 title: "Visualizing the reporting lines of the IAM Manager with a Euler chart"
 output: 
   html_document: 
-    df_print: kable
+    df_print: tibble
     toc: yes
   html_notebook: 
     toc: yes
