@@ -1,0 +1,424 @@
+---
+title: "Visualizing the goals and priorities of IAM"
+output: 
+  html_document: 
+    df_print: default
+    toc: yes
+  html_notebook: 
+    toc: yes
+---
+
+<center> *David Doret* </center>
+<center> *Version 1.0* </center>
+<center> *May 2020* </center>
+
+## In a nutshell
+
+In this R notebook, we analyse survey data related to goals set for Identity and Access Management (IAM) by organizations. Several visualization methods are used including: likert chart, pie chart and multi-histograms.  
+
+## Introduction
+
+As part of the *IAM Performance Measurement 2020 Survey*, I surveyed IAM professionals about the goals and priorities set for IAM by organizations.
+
+The original survey question #23 was:
+
+> What are the key strategic goals set for IAM by top management in your organization?
+
+The notebook focuses on data analysis. The business implications will be discussed in a distinct article.
+
+## Setting up the technical environment
+
+To conduct our data analysis, we first need to setup our R technical environment.
+
+```{r echo=TRUE, message=FALSE}
+
+# Set console to English
+Sys.setenv(LANG = "en");
+
+# Install R packages as needed
+#if(!require("eulerr")) install.packages("eulerr");
+if(!require("tidyr")) install.packages("tidyr");
+if(!require("RCurl")) install.packages("RCurl");
+if(!require("plyr")) install.packages("plyr");
+if(!require("knitr")) install.packages("knitr");
+if(!require("stringr")) install.packages("stringr");
+if(!require("remotes")) install.packages("remotes");
+if(!require("stringr.tools")) remotes::install_github("decisionpatterns/stringr.tools");
+if(!require("sjlabelled")) install.packages("sjlabelled");
+if(!require("naniar")) install.packages("naniar");
+if(!require("tidyverse")) install.packages("tidyverse");
+if(!require("likert")) install.packages("likert");
+if(!require("matrixStats")) install.packages("matrixStats");
+if(!require("sjmisc")) install.packages("sjmisc");
+
+```
+
+Some will notice I don't load libraries. Instead, I prefer to use the unambiguous syntax *package::function*. This makes the code slightly harsher to read but this is a price I am pleased to pay. 
+
+## Retrieving the data
+
+Then we need to load our survey data. In accordance with the *Open Source* and *Open Data* spirit of the *Open-Measure* project, all data is publicly available on GitHub. Isn't that extremely cool, hm?
+
+```{r}
+
+# Configuration options
+survey_url = "https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/IAMPerf2020.csv";
+q23_goal_options_url = "https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/IAMPerf2020Q23GoalOptions.csv";
+q23_priority_options_url = "https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/IAMPerf2020Q23PriorityOptions.csv";
+# In the original survey data, we are interested in question #23: IAM Goals.
+question_number = 23;
+# In the dataset, columns related to this question are prefixed with "Q23R"
+question_prefix = paste("Q", question_number, "R", sep = ""); 
+
+# Download the survey data from GitHub
+# and interpret the CSV to get structured data
+survey_data <- read.csv (text = RCurl::getURL(survey_url));
+q23_goal_options <- read.csv (text = RCurl::getURL(q23_goal_options_url));
+q23_priority_options <- read.csv (text = RCurl::getURL(q23_priority_options_url));
+
+```
+
+## Goals
+
+Let's have a look at our goal categories. These were compiled from a literature review on IAM and are expected to be largely representative of goals set for IAM by organizations. Complementary research on IAM goals and strategy would be required to uncover new goals but as part of this survey research, we limit our analysis to this sample set.
+
+```{r}
+
+# Count the number of goal categories (this will be needed later on)
+goals_count = nrow(q23_goal_options); 
+
+# Have a quick loot at the goal categories
+knitr::kable(q23_goal_options);
+
+```
+
+## Priorities
+
+For every IAM goal in the sample, participants had to answer what was their respective priority levels in their organization. So let's have a look at our priority categories.
+
+```{r}
+
+# In our dataset, the value 5 means "I don't know or not applicable".
+priority_na_value = 5;
+
+# N/A values will be managed by the R native NA object.
+# For convenience, we can remove it from the list of priorities.
+# Of course, we will substitute NA to 5 in the dataset.
+# This process will let us work on the real value factors
+# while still accounting the NA in an elegant manner.
+q23_priority_options = q23_priority_options[q23_priority_options$X != priority_na_value, ];
+
+# And let's have a quick look at the data
+knitr::kable(q23_priority_options);
+
+```
+
+## Question Data
+
+It's now time to prepare our survey data and look at it. 
+
+```{r echo=TRUE}
+
+# In the original survey data, every goal has one corresponding column.
+# They are easily recognizable because they are prefixed by Q23R followed
+# by an integer value.
+interesting_columns = paste(question_prefix, 1:goals_count, sep = "");
+
+# Prepare a data.frame with only those columns we are interested in.
+question_data = survey_data[,interesting_columns];
+
+# Here we are, substitute 5 with NA.
+question_data$Q23R1 = ifelse(question_data$Q23R1 == 5, NA, question_data$Q23R1);
+question_data$Q23R2 = ifelse(question_data$Q23R2 == 5, NA, question_data$Q23R2);
+question_data$Q23R3 = ifelse(question_data$Q23R3 == 5, NA, question_data$Q23R3);
+question_data$Q23R4 = ifelse(question_data$Q23R4 == 5, NA, question_data$Q23R4);
+question_data$Q23R5 = ifelse(question_data$Q23R5 == 5, NA, question_data$Q23R5);
+question_data$Q23R6 = ifelse(question_data$Q23R6 == 5, NA, question_data$Q23R6);
+question_data$Q23R7 = ifelse(question_data$Q23R7 == 5, NA, question_data$Q23R7);
+question_data$Q23R8 = ifelse(question_data$Q23R8 == 5, NA, question_data$Q23R8);
+question_data$Q23R9 = ifelse(question_data$Q23R9 == 5, NA, question_data$Q23R9);
+question_data$Q23R10 = ifelse(question_data$Q23R10 == 5, NA, question_data$Q23R10);
+question_data$Q23R11 = ifelse(question_data$Q23R11 == 5, NA, question_data$Q23R11);
+
+# Apply nicely labeled and properly ordered factors.
+  question_data$Q23R1 = factor(question_data$Q23R1, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R2 = factor(question_data$Q23R2, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R3 = factor(question_data$Q23R3, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R4 = factor(question_data$Q23R4, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R5 = factor(question_data$Q23R5, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R6 = factor(question_data$Q23R6, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R7 = factor(question_data$Q23R7, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R8 = factor(question_data$Q23R8, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R9 = factor(question_data$Q23R9, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R10 = factor(question_data$Q23R10, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R11 = factor(question_data$Q23R11, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
+
+# And let's have a quick look at the top records in our dataset.
+knitr::kable(head(question_data));
+
+```
+
+As we can see, we now have a data structure with one row per survey answer and one column per selectable option (that is IAM goal). The cell values correspond to the priority value set for that goal by the participant.
+
+## Basic Counting
+
+We have a lot of dropouts in surveys, especially at the beginning of the survey. The increase of dropouts as we advance towards the end of the survey should be studied as well but we'll keep this for another workbook. For the time being, let's clarify the size of our sample data and the number of dropouts at question #23.
+
+```{r}
+
+# Count the number of survey answers.
+n = nrow(question_data);
+
+# I count as unanswered those rows where all categorical values are NA.
+na_per_row = colSums(apply(question_data[,interesting_columns], 1, is.na));
+answer_status_per_row = ifelse(
+  na_per_row == 11,
+  "Unanswered",
+  "Answered");
+answered = nrow(question_data[answer_status_per_row == "Answered",]);
+unanswered = nrow(question_data[answer_status_per_row == "Unanswered",]);
+
+# Prepare a legend to inform on the sample size and answer rate.
+legend_block = paste(
+  "n: ", n,
+  ", answered: ", answered, " (", round(answered / n * 100), "%)",
+  ", unanswered:", unanswered, " (", round(unanswered / n * 100), "%)", 
+  sep = "");
+
+print(legend_block)
+
+```
+
+## Likert Chart
+
+We have 3 dimensions in our data: participants, goals and priorities. Data visualization is powerful to help us grasp data, but finding the right visualization technique is sometimes challenging. Here, I choose a Likert chart. It will allow us to see the frequency of participant answers across all goals and all priorities in a single picture. Isn't that amazing?
+
+```{r}
+
+# Re-set the column names to the long titles to get proper labels on the graph.
+colnames(question_data) = q23_goal_options$Title;
+
+likert_data = likert::likert(question_data);
+
+likert_colors = c("#ff9955", "#dddddd", "#5599ff", "#0066ff");
+
+graphics::plot(
+  likert_data,
+  type = "bar",
+  col = likert_colors);
+
+```
+
+Cool, hm?
+
+## Following our intuition: a lack of focus
+
+From the above likert chart we get the strong intuition that many organizations have "lots" of primary goals. This leads me to suspect that that organizations select more than the usual 1, 2, maximum 3 key strategic goals as is generally recommended in management literature. Let's confirm or invalidate this intuition by analyzing the priority frequencies.
+
+We first need to prepare our data to conduct this analysis.
+
+```{r}
+
+question_data = sjmisc::row_count(question_data, count = "Not a Goal", var = "NotAGoal");
+question_data = sjmisc::row_count(question_data, count = "Nice to have", var = "NiceToHave");
+question_data = sjmisc::row_count(question_data, count = "Secondary Goal", var = "SecondaryGoal");
+question_data = sjmisc::row_count(question_data, count = "Primary Goal", var = "PrimaryGoal");
+
+# Our data.frame is now cluttered with too many columns,
+# so let's prepare a new data.frame with only the interesting columns.
+priorities_table = question_data[,c("NotAGoal","NiceToHave","SecondaryGoal","PrimaryGoal")];
+
+# Compute the total number of priority options selected per row (that is, participant). I expressly list the columns for defensive coding.
+priorities_table$AllPriorities = rowSums(
+  priorities_table[, c("NotAGoal","NiceToHave","SecondaryGoal","PrimaryGoal")]
+  );
+
+# It may be interesting to count the number of goals selected per participant.
+# No Goal and Nice To Have are not actively pursued goals and are thus
+# excluded from the count.
+priorities_table$AllGoal =  rowSums(
+  priorities_table[,c("SecondaryGoal","PrimaryGoal")]
+  );
+
+# Remove the rows where we have no goals at all.
+# In effect, we only want to compare answers where we have at least 1 goal.
+# Dropouts must of course be duly reported but separately.
+priorities_table = priorities_table[priorities_table$AllPriorities > 0,];
+
+# Let's have a look at our data now.
+knitr::kable(head(priorities_table));
+
+```
+
+## Defining what a focused strategy precisely is
+
+Let's consider that by definition a focused strategy should comprise a single, perhaps 2 but at the most 3 primary goals. Beyond that, a strategy would be undecisive. What are the implications of this definition?
+
+I consider that organizations with more than 3 IAM primary goals have an improperly defined or undecisive strategy. Let's call this category "**Scattered**".
+
+Organizations that have between 1 and 3 IAM primary goals may have a well-defined, focused strategy. Let's call this category "**Focused**".
+
+And finally, for organizations with 0 IAM strategic goals, two contradictory interpretations are possible:
+
+* Organizations whose goals were not present in the list of 11 typical IAM goals. Such organizations may have a focused strategy, or not.
+* Organizations that really have no primary goal.
+
+Since we can't really know, let's call this last category "**Unknown**".
+
+Ok, enough theory, back to our data.
+
+```{r}
+
+# The 2 thresholds that delineates our 3 categories 
+focused_strategy_threshold = 1;
+scattered_strategy_threshold = 4;
+
+# Assign the strategic categories
+
+priorities_table$Strategy = ifelse(
+  priorities_table$PrimaryGoal < focused_strategy_threshold,
+  "Unknown", 
+  NA);
+
+priorities_table$Strategy = ifelse(
+  priorities_table$PrimaryGoal >= focused_strategy_threshold & 
+  priorities_table$PrimaryGoal < scattered_strategy_threshold,
+  "Focused", 
+  priorities_table$Strategy);
+
+priorities_table$Strategy = ifelse(
+  priorities_table$PrimaryGoal >= scattered_strategy_threshold,
+  "Scattered", 
+  priorities_table$Strategy);
+
+
+```
+
+We are now ready to visualize the data. To start with, let's use an old-style pie chart to get a feeling of the ratio of organization having a **scattered**, **unknown** or **focused** IAM strategy.
+
+```{r}
+
+pie_data = plyr::count(priorities_table$Strategy);
+colnames(pie_data) = c("Strategy", "Frequency");
+factor(
+  x = pie_data$Strategy, 
+  levels = c("Scattered", "Unknown", "Focused"),
+  exclude = NA,
+  ordered = TRUE);
+
+# Re-order the data
+pie_data = pie_data[order(pie_data$Strategy), ];
+
+# Tweak things for the pie chart.
+pie_data$YPosition = cumsum(pie_data$Frequency) - 0.5 * pie_data$Frequency;
+
+# Apply some Open-Measure branding.
+strategy_colors = c("Scattered" = "#ff6600", "Unknown" = "#dddddd", "Focused" = "#0066ff");
+
+# The amazing thing about drawing pie charts with ggplot2 is that it is
+# extremely complex and will take you 3-4 hours to get it right. If you
+# would rather use the native pie chart from R, you would get the same result
+# in... 5 minutes. So why put oneself through this? Well... learning 
+# ggplot2 is expected to be more rewarding in the long-run. Let's hope it 
+# will really be.
+ggplot2::ggplot(
+  data = pie_data, 
+  ggplot2::aes(
+    x = "",
+    y = Frequency,
+    fill = Strategy)
+  ) +
+ ggplot2::geom_bar(width = 1, stat = "identity") + 
+ ggplot2::scale_fill_manual(values = strategy_colors) +
+ ggplot2::geom_text(
+   ggplot2::aes(
+     label = paste(round(Frequency / sum(Frequency) * 100, 1), "%")),
+     position = ggplot2::position_stack(vjust = 0.5)) +
+ ggplot2::theme_light() +
+ ggplot2::theme(
+    plot.title = ggplot2::element_text(hjust=0.5),
+    axis.line = ggplot2::element_blank(),
+    axis.text = ggplot2::element_blank(),
+    axis.ticks = ggplot2::element_blank(),
+    panel.grid  = ggplot2::element_blank()) +
+ ggplot2::coord_polar(theta="y") +
+ ggplot2::ylab("") +
+ ggplot2::labs(fill="Strategy");
+
+```
+
+I still find the pie chart a little ugly. All this work for that result, it's sad.
+
+## Zooming on the frequency distributions with multi-histograms
+
+To gain a deeper insight into priority frequencies, a powerful visualization is the multi-histogram.
+
+Let's first prepare our data...
+
+```{r}
+
+# And now create a single dataset with all observations.
+# This will make it easier to generate multi-histograms later on.
+
+all_priorities = rbind(
+  data.frame(
+    Strategy = priorities_table$Strategy,
+    Priority = "Not a Goal", 
+    Count = priorities_table$NotAGoal),
+  data.frame(    
+    Strategy = priorities_table$Strategy,
+    Priority = "Nice to have", 
+    Count = priorities_table$NiceToHave),
+  data.frame(
+    Strategy = priorities_table$Strategy,
+    Priority = "Secondary Goal", 
+    Count = priorities_table$SecondaryGoal),
+  data.frame(
+    Strategy = priorities_table$Strategy,
+    Priority = "Primary Goal", 
+    Count = priorities_table$PrimaryGoal),
+  data.frame(
+    Strategy = priorities_table$Strategy,
+    Priority = "All Goal", 
+    Count = priorities_table$AllGoal)
+  );
+
+# And have a quick look at our data
+knitr::kable(head(all_priorities));
+
+```
+
+And plot the multi-histogram.
+
+```{r}
+
+ggplot2::ggplot(
+  all_priorities, 
+  ggplot2::aes(x=Count, fill=Strategy)) + 
+  ggplot2::geom_histogram(
+    binwidth=1, 
+    colour="black") + 
+  ggplot2::scale_fill_manual(
+    breaks = all_priorities$Strategy, 
+    values = strategy_colors, 
+    drop = FALSE) +
+  ggplot2::facet_wrap(~ Priority);
+
+```
+
+As you can see, the **scattered**, **unknown** and **focused** strategies are displayed using color codes. This gives a great visual intuition of how these strategies compose the frequency distributions.
+
+# References
+
+I list here a bunch of articles that have been inspiring or helpful while writing this notebook.
+
+ * http://www.cookbook-r.com/Graphs/Plotting_distributions_(ggplot2)/
+ * https://cran.r-project.org/web/packages/likert/likert.pdf
+ * https://ggplot2.tidyverse.org/reference/geom_histogram.html
+ * https://rcompanion.org/handbook/E_03.html
+ * https://rdrr.io/github/decisionpatterns/stringr.tools/
+ * https://rdrr.io/github/decisionpatterns/stringr.tools/man/str_prefix.html
+ * https://www.datanovia.com/en/blog/how-to-create-a-pie-chart-in-r-using-ggplot2/
+ * https://www.r-graph-gallery.com/piechart-ggplot2.html
+ * http://www.sthda.com/english/wiki/ggplot2-pie-chart-quick-start-guide-r-software-and-data-visualization
+ * McNamara A, Horton NJ. 2017. Wrangling categorical data in R. PeerJ Preprints 5:e3163v2 https://doi.org/10.7287/peerj.preprints.3163v2
