@@ -14,7 +14,7 @@ output:
 
 ## In a nutshell
 
-In this R notebook, we analyse survey data related to goals set for Identity and Access Management (IAM) by organizations. Several visualization methods are used including: likert chart, pie chart and multi-histograms.  
+In this R notebook, I analyse survey data related to goals set for Identity and Access Management (IAM) by organizations. Several visualization methods are used including: likert chart, pie chart and multi-histograms.  
 
 ## Introduction
 
