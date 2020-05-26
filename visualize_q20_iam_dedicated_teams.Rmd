@@ -1,0 +1,227 @@
+---
+title: "Visualizing whether IAM teams are predominently shared or dedicated"
+output: 
+  html_document: 
+    df_print: default
+    toc: yes
+  html_notebook: 
+    toc: yes
+---
+
+<center> *David Doret* </center>
+<center> *Version 1.0* </center>
+<center> *May 2020* </center>
+
+## In a nutshell
+
+In this R notebook, I analyse survey data related to whether Identity and Access Management (IAM) teams are predominantly shared or dedicated in organizations, split by IAM sub-domains of activity and for IAM as a whole. A likert chart is used to display the data.  
+
+## Introduction
+
+As part of the *IAM Performance Measurement 2020 Survey*, I surveyed IAM professionals about whether IAM teams were predominantly shared or dedicated for every IAM sub-domain and for IAM as a whole.
+
+The original survey question #20 was:
+
+> In your organization, are IAM processes managed by dedicated and specialized teams? Please choose among the following models the one that best fits your organization.
+> 
+> **Predominantly dedicated**: Most IAM process tasks are managed by specialized teams that are dedicated to IAM. 
+> 
+> **Balanced**: Some IAM process tasks are managed by specialized teams that are dedicated to IAM while others are managed by shared teams for whom IAM is one subject among others. 
+> 
+> **Predominantly shared**: Most IAM process tasks are managed by shared teams for whom IAM is one subject among others, e.g.: IT, Security or Service Desk teams.
+
+The notebook focuses on data analysis. Its business implications are discussed in a distinct article.
+
+## Setting up the technical environment
+
+To conduct our data analysis, we first need to setup our R technical environment.
+
+```{r echo=TRUE, message=FALSE}
+
+# Set console to English
+Sys.setenv(LANG = "en");
+
+# Install R packages as needed
+#if(!require("eulerr")) install.packages("eulerr");
+if(!require("tidyr")) install.packages("tidyr");
+if(!require("RCurl")) install.packages("RCurl");
+if(!require("plyr")) install.packages("plyr");
+if(!require("dplyr")) install.packages("dplyr");
+if(!require("knitr")) install.packages("knitr");
+if(!require("stringr")) install.packages("stringr");
+if(!require("remotes")) install.packages("remotes");
+if(!require("stringr.tools")) remotes::install_github("decisionpatterns/stringr.tools");
+if(!require("sjlabelled")) install.packages("sjlabelled");
+if(!require("naniar")) install.packages("naniar");
+if(!require("tidyverse")) install.packages("tidyverse");
+if(!require("likert")) install.packages("likert");
+if(!require("matrixStats")) install.packages("matrixStats");
+if(!require("sjmisc")) install.packages("sjmisc");
+
+```
+
+Some will notice I don't load libraries. Instead, I prefer to use the unambiguous syntax *package::function*. This makes the code slightly harsher to read but this is a price I am pleased to pay. 
+
+## Retrieving the data
+
+Then we need to load our survey data. In accordance with the *Open Source* and *Open Data* spirit of the *Open-Measure* project, all data is publicly available on GitHub. Isn't that extremely cool, hm?
+
+```{r}
+
+# Configuration options
+# Configuration options
+github_folder_url = "https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/";
+survey_url = paste0(github_folder_url, "IAMPerf2020.csv");
+q20_domains_url = paste0(github_folder_url, "IAMPerf2020Q20Domains.csv");
+q20_team_dedication_url = paste0(github_folder_url, "IAMPerf2020Q20TeamDedication.csv");
+
+# Download the survey data from GitHub
+# and interpret the CSV to get structured data
+survey_data <- read.csv (text = RCurl::getURL(survey_url));
+q20_domains <- read.csv (text = RCurl::getURL(q20_domains_url));
+q20_team_dedication <- read.csv (text = RCurl::getURL(q20_team_dedication_url))
+
+# In the original survey data, we are interested in question #23: IAM Goals.
+question_number = 20;
+# In the dataset, columns related to this question are prefixed with "Q20R"
+question_prefix = paste("Q", question_number, "R", sep = ""); 
+
+```
+
+## IAM domains and sub-domains
+
+Let's have a look at our IAM domain and sub-domain categories. 
+
+```{r}
+
+# Count the number of goal categories (this will be needed later on)
+domains_count = nrow(q20_domains); 
+
+# Have a quick loot at the goal categories
+knitr::kable(q20_domains);
+
+```
+
+## Team dedication
+
+For every IAM domain and sub-domain in the sample, participants had to answer how the corresponding teams were dedicated to their function. So let's have a look at our team dedication categories.
+
+```{r}
+
+# In our dataset, the value 5 means "I don't know or not applicable".
+team_dedication_na_value = 4;
+
+# N/A values will be managed by the R native NA object.
+# For convenience, we can remove it from the list of options
+# Of course, we will substitute NA to that value in the dataset.
+# This process will let us work on the real value factors
+# while still accounting the NA in an elegant manner.
+q20_team_dedication = q20_team_dedication[q20_team_dedication$X != team_dedication_na_value, ];
+
+# And let's have a quick look at the data
+knitr::kable(q20_team_dedication);
+
+```
+
+## Question Data
+
+It's now time to prepare our survey data and look at it. 
+
+```{r echo=TRUE}
+
+# In the original survey data, every domain has one corresponding column.
+# They are easily recognizable because they are prefixed by Q20R followed
+# by an integer value.
+interesting_columns = paste(question_prefix, 1:domains_count, sep = "");
+
+# Prepare a data.frame with only those columns we are interested in.
+question_data = survey_data[,interesting_columns];
+
+# Here we are, substitute 5 with NA.
+question_data$Q20R1 = ifelse(question_data$Q20R1 == 5, NA, question_data$Q20R1);
+question_data$Q20R2 = ifelse(question_data$Q20R2 == 5, NA, question_data$Q20R2);
+question_data$Q20R3 = ifelse(question_data$Q20R3 == 5, NA, question_data$Q20R3);
+question_data$Q20R4 = ifelse(question_data$Q20R4 == 5, NA, question_data$Q20R4);
+question_data$Q20R5 = ifelse(question_data$Q20R5 == 5, NA, question_data$Q20R5);
+question_data$Q20R6 = ifelse(question_data$Q20R6 == 5, NA, question_data$Q20R6);
+
+# Apply nicely labeled and properly ordered factors.
+question_data$Q20R1 = factor(question_data$Q20R1, levels = q20_team_dedication$X, labels = q20_team_dedication$Title, ordered = TRUE, exclude = NA);
+question_data$Q20R2 = factor(question_data$Q20R2, levels = q20_team_dedication$X, labels = q20_team_dedication$Title, ordered = TRUE, exclude = NA);
+question_data$Q20R3 = factor(question_data$Q20R3, levels = q20_team_dedication$X, labels = q20_team_dedication$Title, ordered = TRUE, exclude = NA);
+question_data$Q20R4 = factor(question_data$Q20R4, levels = q20_team_dedication$X, labels = q20_team_dedication$Title, ordered = TRUE, exclude = NA);
+question_data$Q20R5 = factor(question_data$Q20R5, levels = q20_team_dedication$X, labels = q20_team_dedication$Title, ordered = TRUE, exclude = NA);
+question_data$Q20R6 = factor(question_data$Q20R6, levels = q20_team_dedication$X, labels = q20_team_dedication$Title, ordered = TRUE, exclude = NA);
+
+# And let's have a quick look at the top records in our dataset.
+knitr::kable(dplyr::sample_n(question_data, 10));
+
+```
+
+As we can see, we now have a data structure with one row per survey answer and one column per selectable option (that is IAM domain). The cell values correspond to the team dedication value set for that domain by the participant.
+
+## Basic Counting
+
+We have a lot of dropouts in surveys, especially at the beginning of the survey. The increase of dropouts as we advance towards the end of the survey should be studied as well but we'll keep this for another workbook. For the time being, let's clarify the size of our sample data and the number of dropouts for this question.
+
+```{r}
+
+# Count the number of survey answers.
+n = nrow(question_data);
+
+# I count as unanswered those rows where all categorical values are NA.
+na_per_row = colSums(apply(question_data[,interesting_columns], 1, is.na));
+answer_status_per_row = ifelse(
+  na_per_row == 6,
+  "Unanswered",
+  "Answered");
+answered = nrow(question_data[answer_status_per_row == "Answered",]);
+unanswered = nrow(question_data[answer_status_per_row == "Unanswered",]);
+
+# Prepare a legend to inform on the sample size and answer rate.
+legend_block = paste(
+  "n: ", n,
+  ", answered: ", answered, " (", round(answered / n * 100), "%)",
+  ", unanswered:", unanswered, " (", round(unanswered / n * 100), "%)", 
+  sep = "");
+
+print(legend_block)
+
+```
+
+## Likert Chart
+
+We have 3 dimensions in our data: participants, domains and team dedication. Data visualization is powerful to help us grasp data, but finding the right visualization technique is sometimes challenging. Here, I choose a Likert chart. It will allow us to see the frequency of participant answers across all goals and all priorities in a single picture. Isn't that amazing?
+
+```{r}
+
+# Re-set the column names to the long titles to get proper labels on the graph.
+colnames(question_data) = q20_domains$Title;
+
+likert_data = likert::likert(question_data);
+
+likert_colors = c("#ff9955", "#dddddd", "#5599ff");
+
+graphics::plot(
+  likert_data,
+  type = "bar",
+  col = likert_colors)
+
+```
+
+Cool, hm?
+
+# References
+
+I list here a bunch of articles that have been inspiring or helpful while writing this notebook.
+
+ * http://www.cookbook-r.com/Graphs/Plotting_distributions_(ggplot2)/
+ * https://cran.r-project.org/web/packages/likert/likert.pdf
+ * https://ggplot2.tidyverse.org/reference/geom_histogram.html
+ * https://rcompanion.org/handbook/E_03.html
+ * https://rdrr.io/github/decisionpatterns/stringr.tools/
+ * https://rdrr.io/github/decisionpatterns/stringr.tools/man/str_prefix.html
+ * https://www.datanovia.com/en/blog/how-to-create-a-pie-chart-in-r-using-ggplot2/
+ * https://www.r-graph-gallery.com/piechart-ggplot2.html
+ * http://www.sthda.com/english/wiki/ggplot2-pie-chart-quick-start-guide-r-software-and-data-visualization
+ * McNamara A, Horton NJ. 2017. Wrangling categorical data in R. PeerJ Preprints 5:e3163v2 https://doi.org/10.7287/peerj.preprints.3163v2

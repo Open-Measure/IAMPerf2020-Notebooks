@@ -1,5 +1,5 @@
 ---
-title: "Visualizing the reporting lines of the IAM Manager with a Euler chart"
+title: "Visualizing the reporting lines of the IAM Manager"
 output: 
   html_document: 
     df_print: default
@@ -9,6 +9,7 @@ output:
 ---
 
 <center> *David Doret* </center>
+<center> *Version 1.1* </center>
 <center> *May 2020* </center>
 
 ## In a nutshell

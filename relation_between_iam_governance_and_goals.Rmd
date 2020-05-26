@@ -1,0 +1,352 @@
+---
+title: "Investigating the relationship between IAM governance and IAM goals"
+output: 
+  html_document: 
+    df_print: default
+    toc: yes
+  html_notebook: 
+    toc: yes
+---
+
+<center> *David Doret* </center>
+<center> *Version 1.0* </center>
+<center> *May 2020* </center>
+
+## In a nutshell
+
+In this R notebook, I analyse the association between IAM governance setup and IAM goals set for Identity and Access Management (IAM) by organizations. Several visualization methods are used including: likert chart, pie chart and multi-histograms. 
+## Introduction
+
+As part of the *IAM Performance Measurement 2020 Survey*, I surveyed IAM professionals about the reporting lines of IAM managers and the goals and priorities set for IAM by organizations.
+
+## Setting up the technical environment
+
+To conduct our data analysis, we first need to setup our R technical environment.
+
+```{r echo=TRUE, message=FALSE}
+
+# Set console to English
+Sys.setenv(LANG = "en");
+
+# Install R packages as needed
+if(!require("RCurl")) install.packages("RCurl");
+if(!require("GoodmanKruskal")) install.packages("GoodmanKruskal");
+if(!require("sjPlot")) install.packages("sjPlot");
+if(!require("vcd")) install.packages("vcd");
+if(!require("lsr")) install.packages("lsr");
+if(!require("foreach")) install.packages("foreach");
+if(!require("naniar")) install.packages("naniar");
+if(!require("vcdExtra")) install.packages("vcdExtra");
+if(!require("pedometrics")) install.packages("pedometrics");
+
+```
+
+Some will notice I don't load libraries. Instead, I prefer to use the unambiguous syntax *package::function*. This makes the code slightly harsher to read but this is a price I am pleased to pay. 
+
+## Retrieving the data
+
+Then we need to load our survey data. In accordance with the *Open Source* and *Open Data* spirit of the *Open-Measure* project, all data is publicly available on GitHub. Isn't that extremely cool, hm?
+
+```{r}
+
+# Configuration options
+github_folder_url = "https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/";
+survey_url = paste0(github_folder_url, "IAMPerf2020.csv");
+q22_reporting_lines_url = paste0(github_folder_url, "IAMPerf2020Q22ReportingLines.csv");
+q23_goals_url = paste0(github_folder_url, "IAMPerf2020Q23Goals.csv");
+q23_priorities_url = paste0(github_folder_url, "IAMPerf2020Q23Priorities.csv");
+
+# Download the survey data from GitHub
+# and interpret the CSV to get structured data
+survey_data <- read.csv (text = RCurl::getURL(survey_url));
+q22_reporting_lines <- read.csv (text = RCurl::getURL(q22_reporting_lines_url));
+q23_goals <- read.csv (text = RCurl::getURL(q23_goals_url));
+q23_priorities <- read.csv (text = RCurl::getURL(q23_priorities_url))
+
+# Return a name that expresses the strength of the association.
+# Ref.: (Akoglu, 2018)
+get_cramer_v_level_name = function(x){
+  if(length(x) > 1){
+    # Add support for vectors.
+    return(unlist(lapply(x,get_cramer_v_level_name)));
+  } else {
+    threshold_values = c(0.00, 0.05, 0.10, 0.15, 0.25);
+    threshold_names = c("No or very weak", "Weak", "Moderate", "Strong", "Very strong");
+    return(threshold_names[max(which(threshold_values <= x))]);
+    }
+  }
+
+```
+
+## Data preparation
+
+We must prepare our data. This includes
+
+ * Removing dropouts
+ * Substituting survey N/A values with R native NA object
+ * Preparing ordered or unordered factors for categorical variables 
+
+```{r}
+
+## Prepare the data
+
+q22_columns = as.character(q22_reporting_lines$X);
+q23_columns = as.character(q23_goals$X);
+
+# Prepare our data sets with only the columns we are interested in
+q22_data = survey_data[,q22_columns];
+q23_data = survey_data[,q23_columns];
+
+# In Q23, 5 means "I don't know, not applicable".
+# Set it to R native NA.
+q23_na_value = 5;
+q23_priorities = q23_priorities[q23_priorities$X != q23_na_value,];
+q23_data = naniar::replace_with_na_all(
+  data = q23_data,
+  condition = ~.x == q23_na_value
+  );
+
+# Remove dropouts as these are non-meaningful to investigate associations.
+# First, re-glue together the two data sets.
+q22_q23_data = cbind(q22_data, q23_data);
+n = nrow(q22_q23_data);
+q22_q23_data = q22_q23_data[rowSums(is.na(q23_data)) != ncol(q23_data), ];
+answered = nrow(q22_q23_data);
+unanswered = n - answered;
+# Then, un-glue the two data sets (just for convenience).
+q22_data = q22_q23_data[,q22_columns];
+q23_data = q22_q23_data[,q23_columns];
+
+# For question 22, answers are binary, 
+# that is the reporting line category is assigned or not.
+# But in our dataset this is represented by 1s for assigned and NA for unassigned.
+# Now that we have discarded dropouts, we may safely substitute NAs and 1s
+# with factors.
+q22_data = data.frame(
+  Q22A1 = ifelse(is.na(q22_data$Q22A1), 1, 2),
+  Q22A2 = ifelse(is.na(q22_data$Q22A2), 1, 2),
+  Q22A3 = ifelse(is.na(q22_data$Q22A3), 1, 2),
+  Q22A4 = ifelse(is.na(q22_data$Q22A4), 1, 2),
+  Q22A5 = ifelse(is.na(q22_data$Q22A5), 1, 2),
+  Q22A6 = ifelse(is.na(q22_data$Q22A6),  1, 2)
+  );
+
+# Configure factors for question 22.
+# For binary variables, we may argue whether these are ordered or unordered factors.
+# Here, I consider it ordered in the sense that "unassigned" is "lower",
+# and "assigned" represent an "increase". I'm sure we may have a philosophical
+# debate on this.
+configure_q22_factor = function(column_name){
+  # This is not a function, it is rather
+  # a script that creates side effects :-).
+  q22_data[,c(column_name)] <<- factor(
+    x = q22_data[,c(column_name)], 
+    levels = c(1,2), 
+    labels = c("Not assigned", "Assigned"), 
+    exclude = NA, 
+    ordered = TRUE, 
+    nmax = NA);
+  return(column_name);
+}
+i_dont_care = lapply(X = q22_columns, FUN = configure_q22_factor);
+
+# Configure factors for question 23.
+# Here, are categories are clearly ordered, 
+# ranging from the least intense "No Goal" category
+# up to the most intense "Primary Goal" category.
+configure_q23_factor = function(column_name){
+  # This is not a function, it is rather
+  # a script that creates side effects :-).
+  q23_data[,c(column_name)] <<- factor(
+    x = q23_data[,c(column_name)], 
+    levels = q23_priorities$X, 
+    labels = q23_priorities$Title, 
+    exclude = NA, 
+    ordered = TRUE, 
+    nmax = NA);
+  return(column_name);
+}
+i_dont_care = lapply(X = q23_columns, FUN = configure_q23_factor);
+
+# And to keep all our datasets synced, we can re-glue the full dataset.
+q22_q23_data = cbind(q22_data, q23_data);
+
+# Sample size
+paste0(
+  "n:", n, 
+  ", answered: ", answered, " (", round(answered / n * 100,2), "%)",
+  ", Unanswered: ", unanswered, " (", round(unanswered / n * 100,2), "%)"
+  );
+
+```
+
+Good, we have our data ready for analysis and information on the sample size. 
+
+## Significance Test
+
+Now, we want to execute a significance test to determine the probability that there are significant associations between our categorical variables.
+
+From our survey, we know the reporting lines of IAM managers and we know the goal priorities set for IAM in their organizations. Intuitively, we may think that the reporting line of the IAM manager may be associated with certain goals. For example, an organization where the IAM manager reports to the CISO may tend to have security-related goals for IAM while organizations where the IAM manager reports to the COO may have other goals in mind.
+
+Here are our null and alternative hypotheses:
+
+$$H_{0}$$: Governance setup is not associated with IAM goal
+$$H_{1}$$: Governance setup is associated with IAM goal
+
+But we don't want to test a single association. In effect, we have a set of 6 IAM manager reporting line categories and 11 goal categories. This gives us a 6 x 11 matrix of possible associations. 
+
+In consequence, we must analyse a matrix of probable associations. So we will test our hypothesis for all pairs of *IAM manager reporting line* vs *IAM goal*.
+
+```{r}
+
+# We want to test all possible combinations between the
+# categorical variables in q22 with the categorical variables in q23.
+# So prepare a list of all these combinations.
+crossing_table = tidyr::crossing(
+  q22 = q22_reporting_lines$X, 
+  q23 = q23_goals$X
+  );
+# Convert from tibble to native dataframe.
+# This will facilitate the later usage of apply(). 
+crossing_table = as.data.frame(crossing_table);
+
+# Configure factors to get nice column names. 
+# Note that these are unordered this time.
+crossing_table$q22_factor = factor(
+    x = crossing_table$q22, 
+    levels = as.character(q22_reporting_lines$X), 
+    labels = q22_reporting_lines$Title, 
+    exclude = NA, 
+    ordered = FALSE, 
+    nmax = NA);
+crossing_table$q23_factor = factor(
+    x = as.character(crossing_table$q23), 
+    levels = q23_goals$X, 
+    labels = q23_goals$Title, 
+    exclude = NA, 
+    ordered = FALSE, 
+    nmax = NA);
+
+# Declare a function that returns the chi-square p-value
+# for a given pair or categorical columns.
+# The pair parameter is expected to be a vector of size 2. 
+get_association_stats = function(pair){
+  # "The P-value is the probability, under H0, 
+  # that X2 is at least as large as the observed value."
+  # (Agresti, 2019)
+  category_1 = q22_data[,c(pair[1])];
+  category_2 = q23_data[,c(pair[2])];
+
+  # Get the Chi2 statistics
+  contingency_table = table(category_1, category_2);
+  observations = sum(contingency_table);
+  chi2_p_value = NA;
+  chi2 = NA;
+  if(observations > 0){
+    chi2_stats = chisq.test(contingency_table, simulate.p.value = TRUE);
+    chi2_p_value = chi2_stats$p.value;
+    chi2 = chi2_stats$statistic;
+  }
+  
+  # Get the Cramer V statistics
+  vcd_stats = vcd::assocstats(contingency_table);
+  cramer_v = vcd_stats$cramer;
+  # I don't retrieve the contingency coefficient because
+  # it is more suitable with large samples.
+  # Note: we could also get the chi stats from there,
+  # but I'd like to check if the parameters are identical.
+  
+  # Get the Tau statistics
+  tau_stats = GoodmanKruskal::GKtau(x = category_1, y = category_2);
+  tau_xy = tau_stats$tauxy;
+  tau_yx = tau_stats$tauyx;
+  
+  return(c(
+    Observations = observations,
+    chi2_p_value = chi2_p_value,
+    Chi2 = chi2,
+    Cramer_V = cramer_v,
+    Tau_XY = tau_xy,
+    Tau_YX = tau_yx
+  ));
+  
+  }
+
+# Now call our function on all matrix items.
+crossing_table[,c("Observations", "Chi2_P_Value", "Chi2", "Cramer_V", "Tau_XY", "Tau_YX")] = t(apply(crossing_table, 1, get_association_stats));
+
+# To make reading more user friendly, append names to Cramer V coefficients.
+crossing_table$cramer_v_name = get_cramer_v_level_name(crossing_table$cramer_v);
+
+# "The chi-squared approximation improves as $${μ_{ij}}$$ increase
+# and $${μ_{ij} ≥ 5}$$ is usually sufficient for a decent approximation."
+# (Agresti, 2019)
+chi_square_decency_threshold = 5;
+crossing_table$Chi2_Decency = ifelse(
+  !is.na(crossing_table$Chi2) & crossing_table$Observations >= chi_square_decency_threshold, 
+  "Decent", 
+  "Undecent");
+
+# A conventional threshold.
+p_value_significance_level = 0.05;
+crossing_table$Chi2_Significance = ifelse(
+  crossing_table$Chi2_P_Value < p_value_significance_level, 
+  "Significant", 
+  "Non-significant");
+
+#crossing_table[!is.na(crossing_table$Chi2_P_Value) & crossing_table$Chi2_P_Value < 0.05,]
+
+# Let's have a look at our data
+dplyr::sample_n(crossing_table, 10);
+
+```
+
+At this point of our analysis, we see many pairs that have statistically significant associations. We feel happy in the sense that confirming what our original intuition was is always satisfactory. But wait a sec...
+
+## Gaining an understanding of the association's strength with Cramer V
+
+A popular measure to assess the strength (and not the probability) of a relationship between categorical variables is *Cramer V*. And *Cramer V* has the special quality of being independent of the data dimensions, making its results *comparable*. We may for instance state that association $$a$$ is *stronger* than association $$b$$.
+
+```{r}
+
+#plot(A, B, data = T, xlab = "NUMBERS", ylab = "VERTICAL AXIS", colour = I("blue"), size = I(5))
+
+
+View(crossing_table)
+
+
+
+```
+
+
+# References
+
+I list here a bunch of articles that have been inspiring or helpful while writing this notebook.
+
+ * https://www.rdocumentation.org/packages/pedometrics/versions/0.7.0/topics/cramer
+ * https://www.r-bloggers.com/to-eat-or-not-to-eat-thats-the-question-measuring-the-association-between-categorical-variables/
+ * https://stats.idre.ucla.edu/other/mult-pkg/whatstat/
+ * https://www.rdocumentation.org/packages/GoodmanKruskal/versions/0.0.2/topics/GKtau
+ * https://towardsdatascience.com/kendall-rank-correlation-explained-dee01d99c535
+ 
+ 
+* https://cran.r-project.org/web/packages/GoodmanKruskal/vignettes/GoodmanKruskal.html
+ 
+ 
+ ## R tricks
+ 
+ * How to remove rows with all NAs ( https://stackoverflow.com/questions/6471689/remove-rows-in-r-matrix-where-all-data-is-na)
+ * Contingency Tables in R (https://www.datacamp.com/community/tutorials/contingency-tables-r)
+ 
+ ## Statistics
+ 
+ * Agresti, A., 2019. An introduction to categorical data analysis, Third edition. ed, Wiley series in probability and statistics. John Wiley & Sons, Hoboken, NJ.
+ * http://www.sthda.com/english/wiki/chi-square-test-of-independence-in-r
+ * https://stats.stackexchange.com/questions/81483/warning-in-r-chi-squared-approximation-may-be-incorrect
+ * https://stattrek.com/chi-square-test/goodness-of-fit.aspx
+ * https://stat.ethz.ch/R-manual/R-devel/library/stats/html/chisq.test.html 
+ * https://medium.com/analytics-vidhya/canonical-correlation-analysis-cca-in-r-a-non-technical-primer-b67d9bdeb9dd
+ * https://www.rdocumentation.org/packages/GoodmanKruskal/versions/0.0.3/topics/GKtau
+ * https://www.rdocumentation.org/packages/pedometrics/versions/0.7.0
+ * Akoglu, H., 2018. User’s guide to correlation coefficients. Turkish Journal of Emergency Medicine 18, 91–93. https://doi.org/10/ggw2tg
+

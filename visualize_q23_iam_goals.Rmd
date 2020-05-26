@@ -9,7 +9,7 @@ output:
 ---
 
 <center> *David Doret* </center>
-<center> *Version 1.0* </center>
+<center> *Version 1.2* </center>
 <center> *May 2020* </center>
 
 ## In a nutshell
@@ -18,13 +18,13 @@ In this R notebook, I analyse survey data related to goals set for Identity and 
 
 ## Introduction
 
-As part of the *IAM Performance Measurement 2020 Survey*, I surveyed IAM professionals about the goals and priorities set for IAM by organizations.
+As part of the *IAM Performance Measurement 2020 Survey*, I surveyed IAM professionals about the goals and priorities set for IAM by their organizations.
 
 The original survey question #23 was:
 
 > What are the key strategic goals set for IAM by top management in your organization?
 
-The notebook focuses on data analysis. The business implications will be discussed in a distinct article.
+The notebook focuses on data analysis. Its business implications are discussed in a distinct article.
 
 ## Setting up the technical environment
 
@@ -40,6 +40,7 @@ Sys.setenv(LANG = "en");
 if(!require("tidyr")) install.packages("tidyr");
 if(!require("RCurl")) install.packages("RCurl");
 if(!require("plyr")) install.packages("plyr");
+if(!require("dplyr")) install.packages("dplyr");
 if(!require("knitr")) install.packages("knitr");
 if(!require("stringr")) install.packages("stringr");
 if(!require("remotes")) install.packages("remotes");
@@ -62,19 +63,22 @@ Then we need to load our survey data. In accordance with the *Open Source* and *
 ```{r}
 
 # Configuration options
-survey_url = "https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/IAMPerf2020.csv";
-q23_goal_options_url = "https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/IAMPerf2020Q23GoalOptions.csv";
-q23_priority_options_url = "https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/IAMPerf2020Q23PriorityOptions.csv";
-# In the original survey data, we are interested in question #23: IAM Goals.
-question_number = 23;
-# In the dataset, columns related to this question are prefixed with "Q23R"
-question_prefix = paste("Q", question_number, "R", sep = ""); 
+# Configuration options
+github_folder_url = "https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/";
+survey_url = paste0(github_folder_url, "IAMPerf2020.csv");
+q23_goals_url = paste0(github_folder_url, "IAMPerf2020Q23Goals.csv");
+q23_priorities_url = paste0(github_folder_url, "IAMPerf2020Q23Priorities.csv");
 
 # Download the survey data from GitHub
 # and interpret the CSV to get structured data
 survey_data <- read.csv (text = RCurl::getURL(survey_url));
-q23_goal_options <- read.csv (text = RCurl::getURL(q23_goal_options_url));
-q23_priority_options <- read.csv (text = RCurl::getURL(q23_priority_options_url));
+q23_goals <- read.csv (text = RCurl::getURL(q23_goals_url));
+q23_priorities <- read.csv (text = RCurl::getURL(q23_priorities_url))
+
+# In the original survey data, we are interested in question #23: IAM Goals.
+question_number = 23;
+# In the dataset, columns related to this question are prefixed with "Q23R"
+question_prefix = paste("Q", question_number, "R", sep = ""); 
 
 ```
 
@@ -85,10 +89,10 @@ Let's have a look at our goal categories. These were compiled from a literature 
 ```{r}
 
 # Count the number of goal categories (this will be needed later on)
-goals_count = nrow(q23_goal_options); 
+goals_count = nrow(q23_goals); 
 
 # Have a quick loot at the goal categories
-knitr::kable(q23_goal_options);
+knitr::kable(q23_goals);
 
 ```
 
@@ -106,10 +110,10 @@ priority_na_value = 5;
 # Of course, we will substitute NA to 5 in the dataset.
 # This process will let us work on the real value factors
 # while still accounting the NA in an elegant manner.
-q23_priority_options = q23_priority_options[q23_priority_options$X != priority_na_value, ];
+q23_priorities = q23_priorities[q23_priorities$X != priority_na_value, ];
 
 # And let's have a quick look at the data
-knitr::kable(q23_priority_options);
+knitr::kable(q23_priorities);
 
 ```
 
@@ -141,20 +145,20 @@ question_data$Q23R10 = ifelse(question_data$Q23R10 == 5, NA, question_data$Q23R1
 question_data$Q23R11 = ifelse(question_data$Q23R11 == 5, NA, question_data$Q23R11);
 
 # Apply nicely labeled and properly ordered factors.
-  question_data$Q23R1 = factor(question_data$Q23R1, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
-  question_data$Q23R2 = factor(question_data$Q23R2, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
-  question_data$Q23R3 = factor(question_data$Q23R3, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
-  question_data$Q23R4 = factor(question_data$Q23R4, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
-  question_data$Q23R5 = factor(question_data$Q23R5, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
-  question_data$Q23R6 = factor(question_data$Q23R6, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
-  question_data$Q23R7 = factor(question_data$Q23R7, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
-  question_data$Q23R8 = factor(question_data$Q23R8, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
-  question_data$Q23R9 = factor(question_data$Q23R9, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
-  question_data$Q23R10 = factor(question_data$Q23R10, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
-  question_data$Q23R11 = factor(question_data$Q23R11, levels = q23_priority_options$X, labels = q23_priority_options$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R1 = factor(question_data$Q23R1, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R2 = factor(question_data$Q23R2, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R3 = factor(question_data$Q23R3, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R4 = factor(question_data$Q23R4, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R5 = factor(question_data$Q23R5, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R6 = factor(question_data$Q23R6, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R7 = factor(question_data$Q23R7, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R8 = factor(question_data$Q23R8, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R9 = factor(question_data$Q23R9, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R10 = factor(question_data$Q23R10, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R11 = factor(question_data$Q23R11, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
 
 # And let's have a quick look at the top records in our dataset.
-knitr::kable(head(question_data));
+knitr::kable(dplyr::sample_n(question_data, 10));
 
 ```
 
@@ -196,7 +200,7 @@ We have 3 dimensions in our data: participants, goals and priorities. Data visua
 ```{r}
 
 # Re-set the column names to the long titles to get proper labels on the graph.
-colnames(question_data) = q23_goal_options$Title;
+colnames(question_data) = q23_goals$Title;
 
 likert_data = likert::likert(question_data);
 
@@ -246,7 +250,7 @@ priorities_table$AllGoal =  rowSums(
 priorities_table = priorities_table[priorities_table$AllPriorities > 0,];
 
 # Let's have a look at our data now.
-knitr::kable(head(priorities_table));
+knitr::kable(dplyr::sample_n(priorities_table, 10));
 
 ```
 
@@ -291,6 +295,8 @@ priorities_table$Strategy = ifelse(
   "Scattered", 
   priorities_table$Strategy);
 
+# Let's have a look at our data now.
+knitr::kable(dplyr::sample_n(priorities_table, 10));
 
 ```
 
@@ -384,7 +390,7 @@ all_priorities = rbind(
   );
 
 # And have a quick look at our data
-knitr::kable(head(all_priorities));
+knitr::kable(dplyr::sample_n(all_priorities, 10));
 
 ```
 
