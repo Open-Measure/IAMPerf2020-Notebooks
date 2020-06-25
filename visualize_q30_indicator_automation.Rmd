@@ -1,0 +1,242 @@
+---
+title: "Visualizing IAM indicator automation"
+output: 
+  html_document: 
+    df_print: default
+    toc: yes
+  html_notebook: 
+    toc: yes
+---
+
+<center> *David Doret* </center>
+<center> *Version 1.2* </center>
+<center> *June 2020* </center>
+
+## In a nutshell
+
+In this R notebook, I analyse survey data related to the automation of performance indicators.
+
+## Introduction
+
+As part of the *IAM Performance Measurement 2020 Survey*, I surveyed IAM professionals about the degree of IAM performance indicators automation.
+
+The original survey question #30 was:
+
+> What is the degree of automation of data collection, computation and reporting of IAM performance indicators in your organization?
+
+The possible answer categories were:
+
+* Fully or mostly automated with manual interventions only when automation is not feasible
+* Partially automated with a balanced mix of manual tasks and automated tasks
+* Mostly manual starting from data extraction, computation and reporting with only a few automation mechanisms
+* Not applicable or I don't know
+
+The notebook focuses on data analysis. Its business implications are discussed in a distinct article.
+
+## Setting up the technical environment
+
+To conduct our data analysis, we first need to setup our R technical environment.
+
+```{r echo=TRUE, message=FALSE}
+
+# Set console to English
+Sys.setenv(LANG = "en");
+
+# Install R packages as needed
+#if(!require("eulerr")) install.packages("eulerr");
+if(!require("tidyr")) install.packages("tidyr");
+if(!require("RCurl")) install.packages("RCurl");
+if(!require("plyr")) install.packages("plyr");
+if(!require("dplyr")) install.packages("dplyr");
+if(!require("knitr")) install.packages("knitr");
+if(!require("stringr")) install.packages("stringr");
+if(!require("remotes")) install.packages("remotes");
+if(!require("stringr.tools")) remotes::install_github("decisionpatterns/stringr.tools");
+if(!require("sjlabelled")) install.packages("sjlabelled");
+if(!require("naniar")) install.packages("naniar");
+if(!require("tidyverse")) install.packages("tidyverse");
+if(!require("likert")) install.packages("likert");
+if(!require("matrixStats")) install.packages("matrixStats");
+if(!require("sjmisc")) install.packages("sjmisc");
+
+```
+
+Some will notice I don't load libraries. Instead, I prefer to use the unambiguous syntax *package::function*. This makes the code slightly harsher to read but this is a price I am pleased to pay. 
+
+## Retrieving the data
+
+Then we need to load our survey data. In accordance with the *Open Source* and *Open Data* spirit of the *Open-Measure* project, all data is publicly available on GitHub. Isn't that extremely cool, hm?
+
+```{r}
+
+# Configuration options
+github_folder_url = "https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/";
+survey_url = paste0(github_folder_url, "IAMPerf2020.csv");
+q30_indicatorautomation_url = paste0(github_folder_url, "IAMPerf2020Q30IndicatorAutomation.csv");
+
+# Download the survey data from GitHub
+# and interpret the CSV to get structured data
+survey_data <- read.csv (text = RCurl::getURL(survey_url));
+q30_indicatorautomation <- read.csv (text = RCurl::getURL(q30_indicatorautomation_url));
+
+# In the original survey data, we are interested in question #23: IAM Goals.
+question_number = 30;
+# In the dataset, columns related to this question are prefixed with "Q30"
+question_column_name = "Q30";
+
+```
+
+## Options
+
+Let's have a look at our indicator automation options.
+
+```{r}
+
+# Count the number of goal categories (this will be needed later on)
+item_options = nrow(q30_indicatorautomation); 
+
+# Have a quick loot at the goal categories
+knitr::kable(q30_indicatorautomation);
+
+```
+
+## Question Data
+
+It's now time to prepare our survey data and look at it. 
+
+```{r echo=TRUE}
+
+# Prepare a data.frame with only those columns we are interested in.
+question_data = data.frame(Q30 = survey_data[,question_column_name]);
+
+# Apply nicely labeled and properly ordered factors.
+  question_data$Q30 = factor(question_data$Q30, levels = q30_indicatorautomation$X, labels = q30_indicatorautomation$Short, ordered = TRUE, exclude = NA);
+
+# And let's have a quick look at the top records in our dataset.
+knitr::kable(dplyr::sample_n(question_data, 10));
+
+```
+
+As we can see, we now have a data structure with one row per survey answer.
+
+## Basic Counting
+
+We have a lot of dropouts in surveys, especially at the beginning of the survey. The increase of dropouts as we advance towards the end of the survey should be studied as well but we'll keep this for another workbook. For the time being, let's clarify the size of our sample data and the number of dropouts at question #30.
+
+```{r}
+
+# Count the number of survey answers.
+n = nrow(question_data);
+
+# I count as unanswered those rows where all categorical values are NA.
+answered = sum(!is.na(question_data$Q30));
+unanswered = sum(is.na(question_data$Q30));
+
+# NAs
+# The value of 4 means N/A or I don't know.
+# 4 is an actual answer and counts as "answered",
+# while native NA means the respondant did not answer the question at all.
+na_value = 4;
+
+# Remove unanswereds.
+question_data = data.frame(Q30 = question_data$Q30[!is.na(question_data$Q30)]);
+
+# Prepare a legend to inform on the sample size and answer rate.
+legend_block = paste(
+  "n: ", n,
+  ", answered: ", answered, " (", round(answered / n * 100), "%)",
+  ", unanswered:", unanswered, " (", round(unanswered / n * 100), "%)", 
+  sep = "");
+
+print(legend_block)
+
+```
+
+We are now ready to visualize the data. This is where I introduce a pinch of originality. Instead of simply plotting a basic histogram, I chose to enrich the histogram with two enhancements:
+ * Labels will display both the absolute number of answers and their ratio in percentage,
+ * A dotted red line will separate the "real" answers from the "N/A or I don't know" answer, highlighting the distinct nature.
+
+```{r}
+
+color_palette = c("#ff6600", "#ff9955", "#dddddd", "#5599ff", "#0066ff");
+names(color_palette) = c("Dark orange", "Light orange", "Light grey", "Light blue", "Dark blue");
+
+# Count frequencies.
+data_frequencies = plyr::count(question_data$Q30);
+
+data_labels = sjlabelled::get_labels(data_frequencies);
+data_frequencies$labels = c("Mostly\nautomated", "Partially\nautomated", "Mostly\nmanual", "N/A");
+data_frequencies$categories = c("Mostly automated", "Partially automated", "Mostly manual", "N/A");
+
+
+# Tweak ordering for readability purposes
+data_frequencies$graph_position = c(3,2,1,4);
+data_frequencies <- data_frequencies[order(data_frequencies$graph_position),]
+
+graph_legend = paste(data_frequencies$categories," (", data_labels$x, ")", sep="");
+graph_legend = paste(graph_legend, collapse = '\n');
+
+data_frequencies$colors = c("#ff9955", "#dddddd", "#5599ff", "#ffffff");
+
+y_axis_max = ceiling(max(data_frequencies$freq) / 10) * 10;
+
+data_frequencies$ratio = ifelse(
+  is.na(data_frequencies$x),
+  NA,
+  data_frequencies$freq / sum(data_frequencies$freq));
+
+data_frequencies$bar_labels = ifelse(
+  is.na(data_frequencies$x),
+  paste(" ", data_frequencies$freq, " "),
+  paste(
+    data_frequencies$freq,
+    "\n ",
+    round(data_frequencies$ratio * 100),
+    "% ",
+    sep = ""
+  )
+);
+
+# Plot graph.
+
+graphics::par(mar = c(8, 4, 4, 4));
+
+barplot_graph = graphics::barplot(
+  data_frequencies$freq,
+  names = data_frequencies$labels,
+  ylab = "Frequency",
+  ylim = c(0, y_axis_max),
+  col = data_frequencies$colors,
+);
+
+graphics::title(
+  main = "Degree of automation of IAM performance indicators",
+  sub = legend_block,
+  cex.sub = .8,
+  outer = FALSE);
+
+graphics::abline(
+  v = 3.7,
+  col = "red",
+  lwd = 2,
+  lty = 2
+);
+
+plotrix::barlabels(
+  barplot_graph,
+  data_frequencies$freq,
+  labels = data_frequencies$bar_labels,
+  cex = .8,
+  prop = 1,
+  miny = 0,
+  offset = 0,
+  nobox = FALSE
+);
+
+```
+
+# References
+
+I list here a bunch of articles that have been inspiring or helpful while writing this notebook.
+
+ * http://www.cookbook-r.com/Graphs/Plotting_distributions_(ggplot2)/
