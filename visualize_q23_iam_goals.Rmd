@@ -9,8 +9,8 @@ output:
 ---
 
 <center> *David Doret* </center>
-<center> *Version 1.2* </center>
-<center> *May 2020* </center>
+<center> *Version 1.3* </center>
+<center> *May 2020, updated June 2020* </center>
 
 ## In a nutshell
 
@@ -51,6 +51,7 @@ if(!require("tidyverse")) install.packages("tidyverse");
 if(!require("likert")) install.packages("likert");
 if(!require("matrixStats")) install.packages("matrixStats");
 if(!require("sjmisc")) install.packages("sjmisc");
+if(!require("ggplot2")) install.packages("ggplot2");
 
 ```
 
@@ -208,8 +209,11 @@ likert_colors = c("#ff9955", "#dddddd", "#5599ff", "#0066ff");
 
 graphics::plot(
   likert_data,
+  sub = legend_block,
   type = "bar",
-  col = likert_colors);
+  col = likert_colors) + ggplot2::ggtitle(
+    "IAM Key Strategic Goals",
+    subtitle = legend_block);
 
 ```
 
@@ -258,7 +262,7 @@ knitr::kable(dplyr::sample_n(priorities_table, 10));
 
 Let's consider that by definition a focused strategy should comprise a single, perhaps 2 but at the most 3 primary goals. Beyond that, a strategy would be undecisive. What are the implications of this definition?
 
-I consider that organizations with more than 3 IAM primary goals have an improperly defined or undecisive strategy. Let's call this category "**Scattered**".
+I consider that organizations with more than 3 IAM primary goals have an improperly defined or undecisive strategy. Let's call this category "**Weak**".
 
 Organizations that have between 1 and 3 IAM primary goals may have a well-defined, focused strategy. Let's call this category "**Focused**".
 
@@ -275,7 +279,7 @@ Ok, enough theory, back to our data.
 
 # The 2 thresholds that delineates our 3 categories 
 focused_strategy_threshold = 1;
-scattered_strategy_threshold = 4;
+weak_strategy_threshold = 4;
 
 # Assign the strategic categories
 
@@ -286,13 +290,13 @@ priorities_table$Strategy = ifelse(
 
 priorities_table$Strategy = ifelse(
   priorities_table$PrimaryGoal >= focused_strategy_threshold & 
-  priorities_table$PrimaryGoal < scattered_strategy_threshold,
+  priorities_table$PrimaryGoal < weak_strategy_threshold,
   "Focused", 
   priorities_table$Strategy);
 
 priorities_table$Strategy = ifelse(
-  priorities_table$PrimaryGoal >= scattered_strategy_threshold,
-  "Scattered", 
+  priorities_table$PrimaryGoal >= weak_strategy_threshold,
+  "Weak", 
   priorities_table$Strategy);
 
 # Let's have a look at our data now.
@@ -300,7 +304,7 @@ knitr::kable(dplyr::sample_n(priorities_table, 10));
 
 ```
 
-We are now ready to visualize the data. To start with, let's use an old-style pie chart to get a feeling of the ratio of organization having a **scattered**, **unknown** or **focused** IAM strategy.
+We are now ready to visualize the data. To start with, let's use an old-style pie chart to get a feeling of the ratio of organization having a **Weak**, **Unknown** or **Focused** IAM strategy.
 
 ```{r}
 
@@ -308,7 +312,7 @@ pie_data = plyr::count(priorities_table$Strategy);
 colnames(pie_data) = c("Strategy", "Frequency");
 factor(
   x = pie_data$Strategy, 
-  levels = c("Scattered", "Unknown", "Focused"),
+  levels = c("Weak", "Unknown", "Focused"),
   exclude = NA,
   ordered = TRUE);
 
@@ -319,7 +323,7 @@ pie_data = pie_data[order(pie_data$Strategy), ];
 pie_data$YPosition = cumsum(pie_data$Frequency) - 0.5 * pie_data$Frequency;
 
 # Apply some Open-Measure branding.
-strategy_colors = c("Scattered" = "#ff6600", "Unknown" = "#dddddd", "Focused" = "#0066ff");
+strategy_colors = c("Weak" = "#ff6600", "Unknown" = "#dddddd", "Focused" = "#0066ff");
 
 # The amazing thing about drawing pie charts with ggplot2 is that it is
 # extremely complex and will take you 3-4 hours to get it right. If you
@@ -349,7 +353,10 @@ ggplot2::ggplot(
     panel.grid  = ggplot2::element_blank()) +
  ggplot2::coord_polar(theta="y") +
  ggplot2::ylab("") +
- ggplot2::labs(fill="Strategy");
+ ggplot2::labs(fill="Strategy") + 
+ ggplot2::ggtitle(
+    "IAM Focused vs Weak Strategy",
+    subtitle = legend_block);
 
 ```
 
@@ -408,11 +415,15 @@ ggplot2::ggplot(
     breaks = all_priorities$Strategy, 
     values = strategy_colors, 
     drop = FALSE) +
-  ggplot2::facet_wrap(~ Priority);
+  ggplot2::facet_wrap(~ Priority) + 
+  ggplot2::ggtitle(
+    "Distribution of IAM strategic goal categories",
+    subtitle = legend_block);
+
 
 ```
 
-As you can see, the **scattered**, **unknown** and **focused** strategies are displayed using color codes. This gives a great visual intuition of how these strategies compose the frequency distributions.
+As you can see, the **weak**, **unknown** and **focused** strategies are displayed using color codes. This gives a great visual intuition of how these strategies compose the frequency distributions.
 
 # References
 
