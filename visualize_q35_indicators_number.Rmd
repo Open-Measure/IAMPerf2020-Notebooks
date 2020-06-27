@@ -1,0 +1,189 @@
+---
+title: "Visualizing the number of IAM performance indicators used by organizations"
+output: 
+  html_document: 
+    df_print: default
+    toc: yes
+  html_notebook: 
+    toc: yes
+---
+
+<center> *David Doret* </center>
+<center> *Version 1.0* </center>
+<center> *June 2020* </center>
+
+## In a nutshell
+
+In this R notebook, I analyse survey data related to IAM performance indicators actively used by organizations. I then use a Box and Whisker plot to visualize the data and enhance it by overlaying the data points instead of only displaying the outliers.
+
+## Introduction
+
+As part of the *IAM Performance Measurement 2020 Survey*, I surveyed IAM professionals about the number of IAM performance indicators actively used by their organizations.
+
+The original survey question #35 was:
+
+> How many IAM performance indicators does your organization actively uses? You may provide an estimate.
+
+The notebook focuses on data analysis. Its business implications are discussed in a distinct article.
+
+## Setting up the technical environment
+
+To conduct our data analysis, we first need to setup our R technical environment.
+
+```{r echo=TRUE, message=FALSE}
+
+# Set console to English
+Sys.setenv(LANG = "en");
+
+# Install R packages as needed
+if(!require("RCurl")) install.packages("RCurl");
+if(!require("dplyr")) install.packages("dplyr");
+if(!require("knitr")) install.packages("knitr");
+if(!require("ggplot2")) install.packages("ggplot2");
+
+```
+
+Some will notice I don't load libraries. Instead, I prefer to use the unambiguous syntax *package::function*. This makes the code slightly harsher to read but this is a price I am pleased to pay. 
+
+## Retrieving the data
+
+Then we need to load our survey data. In accordance with the *Open Source* and *Open Data* spirit of the *Open-Measure* project, all data is publicly available on GitHub. Isn't that extremely cool, hm?
+
+```{r}
+
+# Configuration options
+# Configuration options
+github_folder_url = "https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/";
+survey_url = paste0(github_folder_url, "IAMPerf2020.csv");
+
+# Download the survey data from GitHub
+# and interpret the CSV to get structured data
+survey_data <- read.csv (text = RCurl::getURL(survey_url));
+
+# In the original survey data, we are interested in question #35: IAM Goals.
+question_number = 35;
+# In the dataset, columns related to this question are prefixed with "Q23R"
+question_column = "Q35";
+
+```
+
+## Question Data
+
+It's now time to prepare our survey data and look at it. 
+
+```{r echo=TRUE}
+
+# Prepare a data.frame with only those columns we are interested in.
+question_data = data.frame(Q35 = survey_data[,question_column]);
+
+# Data cleaning
+Q35Clean = trimws(survey_data$Q35);
+Q35Clean = ifelse(Q35Clean == "", NA, Q35Clean);
+Q35Clean = ifelse(Q35Clean == "8-10", 10, Q35Clean);
+Q35Clean = ifelse(Q35Clean == "10-12", 11, Q35Clean);
+Q35Clean = strtoi(Q35Clean);
+question_data$Q35Clean = Q35Clean;
+
+# And let's have a quick look at the top records in our dataset.
+knitr::kable(dplyr::sample_n(question_data[survey_data$Q35 != "",], 10));
+
+```
+
+As we can see, we now have a data structure with one row per survey answer and one column with our question data.
+
+## Basic Counting
+
+We have a lot of dropouts in surveys, especially at the beginning of the survey. The increase of dropouts as we advance towards the end of the survey should be studied as well but we'll keep this for another workbook. For the time being, let's clarify the size of our sample data and the number of dropouts at question #35.
+
+```{r}
+
+# Count the number of survey answers.
+n = nrow(question_data);
+
+# I count as unanswered those rows where all categorical values are NA.
+na_per_row = is.na(question_data$Q35Clean);
+answer_status_per_row = ifelse(
+  na_per_row,
+  "Unanswered",
+  "Answered");
+answered = nrow(question_data[answer_status_per_row == "Answered",]);
+unanswered = nrow(question_data[answer_status_per_row == "Unanswered",]);
+
+# Prepare a legend to inform on the sample size and answer rate.
+legend_block = paste(
+  "n: ", n,
+  ", answered: ", answered, " (", round(answered / n * 100), "%)",
+  ", unanswered:", unanswered, " (", round(unanswered / n * 100), "%)", 
+  sep = "");
+
+print(legend_block)
+
+```
+
+We no longer need NA values.
+
+```{r}
+question_data = data.frame(
+  Q35 = question_data$Q35Clean[!is.na(question_data$Q35Clean)])
+```
+
+## Box and Whisker
+
+To visualize the data, I choose the standard Box and Whisker plot. I choose to enhance it by displaying all data points on top of the graph instead of only showing the outliers. 
+
+```{r}
+light_grey = "#dddddd";
+light_blue = "#5599ff";
+dark_blue = "#0066ff";
+
+ggplot2::ggplot(
+  question_data, 
+  ggplot2::aes(Q35, "")) +
+  ggplot2::stat_boxplot(
+    width = 0.25,
+    size = 1.2,
+    geom = "errorbar") + 
+  ggplot2::geom_boxplot(
+    outlier.shape = NA,
+    lwd = 0.2,
+    fill = "#FFFFFF") + 
+  ggplot2::geom_jitter(
+    size = 3,
+    shape = 21,
+    fill = light_blue,
+    colour = "#000000") +
+ ggplot2::ggtitle(
+    "Actively Used IAM Performance Indicators (Box and Whiskers)",
+    subtitle = legend_block);
+
+```
+
+## Histogram
+
+Histograms are great but bins hide the distribution details. Because here we don't have too many discrete values, we may as well plot an histogram with bins of size 1. Visually, I find it interesting too and it boils down to a question of preferences. 
+
+```{r}
+
+ggplot2::ggplot(
+  question_data, 
+  ggplot2::aes(x = Q35)) + 
+  ggplot2::geom_histogram(
+    binwidth = 1, 
+    colour = "#000000",
+    fill = light_blue) + 
+  ggplot2::ggtitle(
+    "Actively Used IAM Performance Indicators (Histogram)",
+    subtitle = legend_block);
+
+
+```
+
+# References
+
+I list here a bunch of articles that have been inspiring or helpful while writing this notebook.
+
+ * https://stackoverflow.com/questions/29587881/increase-plot-size-width-in-ggplot2
+ * https://ropensci.github.io/plotly/ggplot2/geom_boxplot.html
+ * https://ggplot2.tidyverse.org/reference/geom_jitter.html#aesthetics
+ * https://ggplot2.tidyverse.org/reference/geom_boxplot.html
+ 
