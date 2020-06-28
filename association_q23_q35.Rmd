@@ -196,7 +196,14 @@ question_data$AllPriorities = rowSums(
 # No Goal and Nice To Have are not actively pursued goals and are thus
 # excluded from the count.
 question_data$AllGoal =  rowSums(
-  question_data[,c("SecondaryGoal","PrimaryGoal")]
+  question_data[,c("PrimaryGoal","SecondaryGoal")]
+  );
+
+# It may be interesting to count the number of goals selected per participant.
+# No Goal and Nice To Have are not actively pursued goals and are thus
+# excluded from the count.
+question_data$AllGoalPlusNiceToHave =  rowSums(
+  question_data[,c("PrimaryGoal","SecondaryGoal","NiceToHave")]
   );
 
 # Let's have a look at our data now.
@@ -235,24 +242,19 @@ knitr::kable(dplyr::sample_n(data.frame(Strategy = question_data$Strategy), 10))
 
 ```
 
-## Association between number of primary strategic goals a number of indicators
+## Association between number of primary strategic goals and number of indicators
 
-Because both variables are discrete and ordinal, we will use Kendall's Tau.
-
-Let's execute the statistical test first.
+Because both variables are discrete and ordinal, we will use Kendall's Tau. Let's execute the statistical test first.
 
 ```{r}
-
 cor.test(question_data$PrimaryGoal, question_data$Q35,  method="kendall", exact = FALSE)
-
 ```
 
 And inspect visually the scatter plot:
 
 ```{r}
 
-
-plot_1 = ggpubr::ggscatter(
+ggpubr::ggscatter(
   question_data, x = "PrimaryGoal", y = "Q35", 
   add = "reg.line", 
   conf.int = TRUE, 
@@ -263,14 +265,13 @@ plot_1 = ggpubr::ggscatter(
   ggplot2::ggtitle(
     "Association of primary strategic goals with indicators")
 
-
 ```
 
-I do not include the statistical discussion here, it will be part of the research article. 
+I do not include the statistical discussion here, it will be covered in the research paper. 
 
-## Association between overall number of strategic goals a number of indicators
+## Association between overall number of strategic goals and number of indicators
 
-Let's execute the statistical test first.
+Same assumptions, relaxed hypothesis. Let's execute the statistical test first.
 
 ```{r}
 
@@ -288,10 +289,41 @@ ggpubr::ggscatter(
   conf.int = TRUE, 
   cor.coef = TRUE, 
   cor.method = "kendall",
-  xlab = "Number of primary strategic goals", 
+  xlab = "Number of strategic goals", 
   ylab = "Number of indicators") + 
   ggplot2::ggtitle(
     "Association of strategic goals with indicators")
+
+```
+
+Again, I do not include the statistical discussion here, it will be part of the research article. 
+
+## Association between goals + nice-to-haves and number of indicators
+
+Same assumptions, even more relaxed hypothesis. Let's execute the statistical test first.
+
+```{r}
+
+cor.test(
+  question_data$AllGoalPlusNiceToHave, 
+  question_data$Q35,  method="kendall", exact = FALSE)
+
+```
+
+And inspect visually the scatter plot:
+
+```{r}
+
+ggpubr::ggscatter(
+  question_data, x = "AllGoalPlusNiceToHave", y = "Q35", 
+  add = "reg.line", 
+  conf.int = TRUE, 
+  cor.coef = TRUE, 
+  cor.method = "kendall",
+  xlab = "Number of goals + nice-to-haves", 
+  ylab = "Number of indicators") + 
+  ggplot2::ggtitle(
+    "Association of goals plus nice-to-haves with indicators")
 
 ```
 
@@ -305,4 +337,4 @@ I list here a bunch of articles that have been inspiring or helpful while writin
  * https://journals.sagepub.com/doi/pdf/10.1177/8756479308317006
  * https://www.rdocumentation.org/packages/VGAM/versions/1.1-2/topics/kendall.tau
  * https://www.spss-tutorials.com/kendalls-tau/
- * https://support.minitab.com/en-us/minitab/19/help-and-how-to/quality-and-process-improvement/measurement-system-analysis/how-to/attribute-agreement-analysis/attribute-agreement-analysis/interpret-the-results/all-statistics-and-graphs/kendall-s-coefficients/#:~:text=The%20p%2Dvalue%20is%20a,to%20reject%20the%20null%20hypothesis.
+ * https://support.minitab.com/en-us/minitab/19/help-and-how-to/quality-and-process-improvement/measurement-system-analysis/how-to/attribute-agreement-analysis/attribute-agreement-analysis/interpret-the-results/all-statistics-and-graphs/kendall-s-coefficients/
