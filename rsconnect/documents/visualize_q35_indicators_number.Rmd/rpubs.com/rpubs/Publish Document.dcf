@@ -6,5 +6,5 @@ server: rpubs.com
 hostUrl: rpubs.com
 appId: https://api.rpubs.com/api/v1/document/633101/3a091de3314c478a9869d7d46eabf4ef
 bundleId: https://api.rpubs.com/api/v1/document/633101/3a091de3314c478a9869d7d46eabf4ef
-url: http://rpubs.com/publish/claim/633101/dac1691f38e9440287013f3e1cd2675c
-when: 1593287051.53241
+url: http://rpubs.com/OpenMeasure/633101
+when: 1593291797.74909

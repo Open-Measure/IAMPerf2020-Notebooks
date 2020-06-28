@@ -1,0 +1,308 @@
+---
+title: "Association between number of goals and number of indicators"
+output: 
+  html_document: 
+    df_print: default
+    toc: yes
+  html_notebook: 
+    toc: yes
+---
+
+<center> *David Doret* </center>
+<center> *Version 1.0* </center>
+<center> *June 2020* </center>
+
+## In a nutshell
+
+In this R notebook, I analyse survey data to determine if the number of IAM strategic goals is positively associated with the number of IAM performance indicators used by organizations. Because both variables are discrete and ordinal, I use Kendall's Tau for the statistical test and visualization is done with scatter plots. 
+
+## Introduction
+
+As part of the *IAM Performance Measurement 2020 Survey*, I surveyed IAM professionals about the goals and priorities set for IAM by their organizations and the number of IAM performance indicators they actively use.
+
+This notebook focuses on data analysis. Its business implications are discussed in a distinct article.
+
+## Setting up the technical environment
+
+To conduct our data analysis, we first need to setup our R technical environment.
+
+```{r echo=TRUE, message=FALSE}
+
+# Set console to English
+Sys.setenv(LANG = "en");
+
+# Install R packages as needed
+#if(!require("eulerr")) install.packages("eulerr");
+if(!require("tidyr")) install.packages("tidyr");
+if(!require("RCurl")) install.packages("RCurl");
+if(!require("plyr")) install.packages("plyr");
+if(!require("dplyr")) install.packages("dplyr");
+if(!require("knitr")) install.packages("knitr");
+if(!require("stringr")) install.packages("stringr");
+if(!require("remotes")) install.packages("remotes");
+if(!require("stringr.tools")) remotes::install_github("decisionpatterns/stringr.tools");
+if(!require("sjlabelled")) install.packages("sjlabelled");
+if(!require("naniar")) install.packages("naniar");
+if(!require("tidyverse")) install.packages("tidyverse");
+if(!require("likert")) install.packages("likert");
+if(!require("matrixStats")) install.packages("matrixStats");
+if(!require("sjmisc")) install.packages("sjmisc");
+if(!require("ggplot2")) install.packages("ggplot2");
+if(!require("ggpubr")) install.packages("ggpubr");
+if(!require("VGAM")) install.packages("VGAM");
+if(!require("gridExtra")) install.packages("gridExtra");
+
+```
+
+Some will notice I don't load libraries. Instead, I prefer to use the unambiguous syntax *package::function*. This makes the code slightly harsher to read but this is a price I am pleased to pay. 
+
+## Retrieving the data
+
+Then we need to load our survey data. In accordance with the *Open Source* and *Open Data* spirit of the *Open-Measure* project, all data is publicly available on GitHub. Isn't that extremely cool, hm?
+
+```{r}
+
+# Configuration options
+github_folder_url = "https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/";
+survey_url = paste0(github_folder_url, "IAMPerf2020.csv");
+q23_goals_url = paste0(github_folder_url, "IAMPerf2020Q23Goals.csv");
+q23_priorities_url = paste0(github_folder_url, "IAMPerf2020Q23Priorities.csv");
+
+# Download the survey data from GitHub
+# and interpret the CSV to get structured data
+survey_data <- read.csv (text = RCurl::getURL(survey_url));
+q23_goals <- read.csv (text = RCurl::getURL(q23_goals_url));
+q23_priorities <- read.csv (text = RCurl::getURL(q23_priorities_url))
+
+# In the original survey data, we are interested in question #23: IAM Goals.
+question_number = 23;
+# In the dataset, columns related to this question are prefixed with "Q23R"
+question_prefix = paste("Q", question_number, "R", sep = ""); 
+
+```
+
+## Preparing the data
+
+Preparing the data is always the lengthy part in data analysis...
+
+```{r}
+
+# Count the number of goal categories (this will be needed later on)
+goals_count = nrow(q23_goals); 
+
+# In our dataset, the value 5 means "I don't know or not applicable".
+priority_na_value = 5;
+
+# N/A values will be managed by the R native NA object.
+# For convenience, we can remove it from the list of priorities.
+# Of course, we will substitute NA to 5 in the dataset.
+# This process will let us work on the real value factors
+# while still accounting the NA in an elegant manner.
+q23_priorities = q23_priorities[q23_priorities$X != priority_na_value, ];
+
+# In the original survey data, every goal has one corresponding column.
+# They are easily recognizable because they are prefixed by Q23R followed
+# by an integer value.
+iam_goals_columns = paste(question_prefix, 1:goals_count, sep = "");
+
+# Prepare a data.frame with only those columns we are interested in.
+question_data = survey_data[,iam_goals_columns];
+
+# Here we are, substitute 5 with NA.
+question_data$Q23R1 = ifelse(question_data$Q23R1 == 5, NA, question_data$Q23R1);
+question_data$Q23R2 = ifelse(question_data$Q23R2 == 5, NA, question_data$Q23R2);
+question_data$Q23R3 = ifelse(question_data$Q23R3 == 5, NA, question_data$Q23R3);
+question_data$Q23R4 = ifelse(question_data$Q23R4 == 5, NA, question_data$Q23R4);
+question_data$Q23R5 = ifelse(question_data$Q23R5 == 5, NA, question_data$Q23R5);
+question_data$Q23R6 = ifelse(question_data$Q23R6 == 5, NA, question_data$Q23R6);
+question_data$Q23R7 = ifelse(question_data$Q23R7 == 5, NA, question_data$Q23R7);
+question_data$Q23R8 = ifelse(question_data$Q23R8 == 5, NA, question_data$Q23R8);
+question_data$Q23R9 = ifelse(question_data$Q23R9 == 5, NA, question_data$Q23R9);
+question_data$Q23R10 = ifelse(question_data$Q23R10 == 5, NA, question_data$Q23R10);
+question_data$Q23R11 = ifelse(question_data$Q23R11 == 5, NA, question_data$Q23R11);
+
+# Q35: Number of indicators
+question_data$Q35 = survey_data$Q35;
+
+# Apply nicely labeled and properly ordered factors.
+  question_data$Q23R1 = factor(question_data$Q23R1, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R2 = factor(question_data$Q23R2, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R3 = factor(question_data$Q23R3, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R4 = factor(question_data$Q23R4, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R5 = factor(question_data$Q23R5, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R6 = factor(question_data$Q23R6, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R7 = factor(question_data$Q23R7, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R8 = factor(question_data$Q23R8, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R9 = factor(question_data$Q23R9, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R10 = factor(question_data$Q23R10, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+  question_data$Q23R11 = factor(question_data$Q23R11, levels = q23_priorities$X, labels = q23_priorities$Title, ordered = TRUE, exclude = NA);
+
+```
+
+## Break offs
+
+For this notebook, let's count and retrieve thos survey answers where we have both IAM goals data (Q23) and number of indicators (Q35).
+
+```{r}
+
+# Count the number of survey answers.
+n = nrow(question_data);
+
+# To correlate Q23 and Q35, I obviously need both questions to be answered.
+# For Q23 I count as unanswered when all Goal categorical values are NA.
+# For Q35 I count as unanswered when NA. 
+na_per_row = colSums(apply(question_data[,iam_goals_columns], 1, is.na));
+completion_status = ifelse(
+  na_per_row == 11 | is.na(question_data$Q35),
+  "Incomplete",
+  "Complete");
+complete = nrow(question_data[completion_status == "Complete",]);
+incomplete = nrow(question_data[completion_status == "Incomplete",]);
+
+# Prepare a legend to inform on the sample size and answer rate.
+legend_block = paste(
+  "n: ", n,
+  ", complete: ", complete, " (", round(complete / n * 100), "%)",
+  ", incomplete:", incomplete, " (", round(incomplete / n * 100), "%)", 
+  sep = "");
+
+print(legend_block)
+
+```
+
+Now that we reported the presence of incomplete answers, we may drop these useless records.
+
+```{r}
+question_data = question_data[completion_status == "Complete",];
+```
+
+## Preparing the data (continued)
+
+Every candidate IAM goal has a dedicated column. To count the number of goals, we need to count "horizontally" the presence of values in this subset of columns.
+
+```{r}
+
+question_data$NotAGoal = sjmisc::row_count(question_data[,iam_goals_columns], count = "Not a Goal", var = "NotAGoal", append = FALSE)$NotAGoal;
+question_data$NiceToHave = sjmisc::row_count(question_data[,iam_goals_columns], count = "Nice to have", var = "NiceToHave", append = FALSE)$NiceToHave;
+question_data$SecondaryGoal = sjmisc::row_count(question_data[,iam_goals_columns], count = "Secondary Goal", var = "SecondaryGoal", append = FALSE)$SecondaryGoal;
+question_data$PrimaryGoal = sjmisc::row_count(question_data[,iam_goals_columns], count = "Primary Goal", var = "PrimaryGoal", append = FALSE)$PrimaryGoal;
+
+# Compute the total number of priority options selected per row (that is, participant).
+question_data$AllPriorities = rowSums(
+  question_data[, c("NotAGoal","NiceToHave","SecondaryGoal","PrimaryGoal")]
+  );
+
+# It may be interesting to count the number of goals selected per participant.
+# No Goal and Nice To Have are not actively pursued goals and are thus
+# excluded from the count.
+question_data$AllGoal =  rowSums(
+  question_data[,c("SecondaryGoal","PrimaryGoal")]
+  );
+
+# Let's have a look at our data now.
+knitr::kable(dplyr::sample_n(question_data[, c("NotAGoal","NiceToHave","SecondaryGoal","PrimaryGoal", "AllPriorities", "AllGoal")], 10));
+
+```
+
+In a precedent notebook we defined what focused and weak IAM strategies are. Let's count these.
+
+```{r}
+
+# The 2 thresholds that delineates our 3 categories 
+focused_strategy_threshold = 1;
+weak_strategy_threshold = 4;
+
+# Assign the strategic categories
+
+question_data$Strategy = ifelse(
+  question_data$PrimaryGoal < focused_strategy_threshold,
+  "Unknown", 
+  NA);
+
+question_data$Strategy = ifelse(
+  question_data$PrimaryGoal >= focused_strategy_threshold & 
+  question_data$PrimaryGoal < weak_strategy_threshold,
+  "Focused", 
+  question_data$Strategy);
+
+question_data$Strategy = ifelse(
+  question_data$PrimaryGoal >= weak_strategy_threshold,
+  "Weak", 
+  question_data$Strategy);
+
+# Let's have a look at our data now.
+knitr::kable(dplyr::sample_n(data.frame(Strategy = question_data$Strategy), 10));
+
+```
+
+## Association between number of primary strategic goals a number of indicators
+
+Because both variables are discrete and ordinal, we will use Kendall's Tau.
+
+Let's execute the statistical test first.
+
+```{r}
+
+cor.test(question_data$PrimaryGoal, question_data$Q35,  method="kendall", exact = FALSE)
+
+```
+
+And inspect visually the scatter plot:
+
+```{r}
+
+
+plot_1 = ggpubr::ggscatter(
+  question_data, x = "PrimaryGoal", y = "Q35", 
+  add = "reg.line", 
+  conf.int = TRUE, 
+  cor.coef = TRUE, 
+  cor.method = "kendall",
+  xlab = "Number of primary strategic goals", 
+  ylab = "Number of indicators") + 
+  ggplot2::ggtitle(
+    "Association of primary strategic goals with indicators")
+
+
+```
+
+I do not include the statistical discussion here, it will be part of the research article. 
+
+## Association between overall number of strategic goals a number of indicators
+
+Let's execute the statistical test first.
+
+```{r}
+
+cor.test(question_data$AllGoal, question_data$Q35,  method="kendall", exact = FALSE)
+
+```
+
+And inspect visually the scatter plot:
+
+```{r}
+
+ggpubr::ggscatter(
+  question_data, x = "AllGoal", y = "Q35", 
+  add = "reg.line", 
+  conf.int = TRUE, 
+  cor.coef = TRUE, 
+  cor.method = "kendall",
+  xlab = "Number of primary strategic goals", 
+  ylab = "Number of indicators") + 
+  ggplot2::ggtitle(
+    "Association of strategic goals with indicators")
+
+```
+
+Again, I do not include the statistical discussion here, it will be part of the research article. 
+
+# References
+
+I list here a bunch of articles that have been inspiring or helpful while writing this notebook.
+
+ * http://www.sthda.com/english/wiki/correlation-test-between-two-variables-in-r
+ * https://journals.sagepub.com/doi/pdf/10.1177/8756479308317006
+ * https://www.rdocumentation.org/packages/VGAM/versions/1.1-2/topics/kendall.tau
+ * https://www.spss-tutorials.com/kendalls-tau/
+ * https://support.minitab.com/en-us/minitab/19/help-and-how-to/quality-and-process-improvement/measurement-system-analysis/how-to/attribute-agreement-analysis/attribute-agreement-analysis/interpret-the-results/all-statistics-and-graphs/kendall-s-coefficients/#:~:text=The%20p%2Dvalue%20is%20a,to%20reject%20the%20null%20hypothesis.

@@ -9,7 +9,7 @@ output:
 ---
 
 <center> *David Doret* </center>
-<center> *Version 1.0* </center>
+<center> *Version 1.1* </center>
 <center> *June 2020* </center>
 
 ## In a nutshell
@@ -74,18 +74,16 @@ It's now time to prepare our survey data and look at it.
 ```{r echo=TRUE}
 
 # Prepare a data.frame with only those columns we are interested in.
-question_data = data.frame(Q35 = survey_data[,question_column]);
-
-# Data cleaning
-Q35Clean = trimws(survey_data$Q35);
-Q35Clean = ifelse(Q35Clean == "", NA, Q35Clean);
-Q35Clean = ifelse(Q35Clean == "8-10", 10, Q35Clean);
-Q35Clean = ifelse(Q35Clean == "10-12", 11, Q35Clean);
-Q35Clean = strtoi(Q35Clean);
-question_data$Q35Clean = Q35Clean;
+question_data = data.frame(Q35 = survey_data$Q35);
 
 # And let's have a quick look at the top records in our dataset.
-knitr::kable(dplyr::sample_n(question_data[survey_data$Q35 != "",], 10));
+knitr::kable(
+  dplyr::sample_n(
+    data.frame(
+      Q35 = question_data[!is.na(survey_data$Q35),]
+      ),10
+    ),
+  );
 
 ```
 
@@ -101,13 +99,9 @@ We have a lot of dropouts in surveys, especially at the beginning of the survey.
 n = nrow(question_data);
 
 # I count as unanswered those rows where all categorical values are NA.
-na_per_row = is.na(question_data$Q35Clean);
-answer_status_per_row = ifelse(
-  na_per_row,
-  "Unanswered",
-  "Answered");
-answered = nrow(question_data[answer_status_per_row == "Answered",]);
-unanswered = nrow(question_data[answer_status_per_row == "Unanswered",]);
+is_na = is.na(question_data$Q35);
+unanswered = length(is_na[is_na]);
+answered = n - unanswered;
 
 # Prepare a legend to inform on the sample size and answer rate.
 legend_block = paste(
@@ -124,7 +118,7 @@ We no longer need NA values.
 
 ```{r}
 question_data = data.frame(
-  Q35 = question_data$Q35Clean[!is.na(question_data$Q35Clean)])
+  Q35 = question_data$Q35[!is.na(question_data$Q35)])
 ```
 
 ## Box and Whisker
@@ -186,4 +180,5 @@ I list here a bunch of articles that have been inspiring or helpful while writin
  * https://ropensci.github.io/plotly/ggplot2/geom_boxplot.html
  * https://ggplot2.tidyverse.org/reference/geom_jitter.html#aesthetics
  * https://ggplot2.tidyverse.org/reference/geom_boxplot.html
+ * https://stackoverflow.com/questions/2190756/how-to-count-true-values-in-a-logical-vector
  
