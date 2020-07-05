@@ -9,8 +9,8 @@ output:
 ---
 
 <center> *David Doret* </center>
-<center> *Version 1.0* </center>
-<center> *May 2020* </center>
+<center> *Version 1.1* </center>
+<center> *Created May 2020, Last Revised June 2020* </center>
 
 ## In a nutshell
 
@@ -42,44 +42,21 @@ To conduct our data analysis, we first need to setup our R technical environment
 Sys.setenv(LANG = "en");
 
 # Install R packages as needed
-#if(!require("eulerr")) install.packages("eulerr");
-if(!require("tidyr")) install.packages("tidyr");
-if(!require("RCurl")) install.packages("RCurl");
-if(!require("plyr")) install.packages("plyr");
-if(!require("dplyr")) install.packages("dplyr");
+if(!require("devtools")) install.packages("devtools");
 if(!require("knitr")) install.packages("knitr");
-if(!require("stringr")) install.packages("stringr");
-if(!require("remotes")) install.packages("remotes");
-if(!require("stringr.tools")) remotes::install_github("decisionpatterns/stringr.tools");
-if(!require("sjlabelled")) install.packages("sjlabelled");
-if(!require("naniar")) install.packages("naniar");
-if(!require("tidyverse")) install.packages("tidyverse");
 if(!require("likert")) install.packages("likert");
-if(!require("matrixStats")) install.packages("matrixStats");
-if(!require("sjmisc")) install.packages("sjmisc");
 
 ```
 
-Some will notice I don't load libraries. Instead, I prefer to use the unambiguous syntax *package::function*. This makes the code slightly harsher to read but this is a price I am pleased to pay. 
-
-## Retrieving the data
+## Loading the IAMPerf2020 data environment
 
 Then we need to load our survey data. In accordance with the *Open Source* and *Open Data* spirit of the *Open-Measure* project, all data is publicly available on GitHub. Isn't that extremely cool, hm?
 
+I centralized data loading in a "setup" script to simplify the loading of all data, the application of consistent factors, etc.
+
 ```{r}
-
-# Configuration options
-# Configuration options
-github_folder_url = "https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/";
-survey_url = paste0(github_folder_url, "IAMPerf2020.csv");
-q20_domains_url = paste0(github_folder_url, "IAMPerf2020Q20Domains.csv");
-q20_team_dedication_url = paste0(github_folder_url, "IAMPerf2020Q20TeamDedication.csv");
-
-# Download the survey data from GitHub
-# and interpret the CSV to get structured data
-survey_data <- read.csv (text = RCurl::getURL(survey_url));
-q20_domains <- read.csv (text = RCurl::getURL(q20_domains_url));
-q20_team_dedication <- read.csv (text = RCurl::getURL(q20_team_dedication_url))
+# Load the IAMPerf2020 data environment.
+devtools::source_url("https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/IAMPerf2020Setup.R?raw=TRUE")
 
 # In the original survey data, we are interested in question #23: IAM Goals.
 question_number = 20;
@@ -95,10 +72,10 @@ Let's have a look at our IAM domain and sub-domain categories.
 ```{r}
 
 # Count the number of goal categories (this will be needed later on)
-domains_count = nrow(q20_domains); 
+domains_count = nrow(iamperf2020_q20_domains); 
 
 # Have a quick loot at the goal categories
-knitr::kable(q20_domains);
+knitr::kable(iamperf2020_q20_domains);
 
 ```
 
@@ -108,18 +85,8 @@ For every IAM domain and sub-domain in the sample, participants had to answer ho
 
 ```{r}
 
-# In our dataset, the value 5 means "I don't know or not applicable".
-team_dedication_na_value = 4;
-
-# N/A values will be managed by the R native NA object.
-# For convenience, we can remove it from the list of options
-# Of course, we will substitute NA to that value in the dataset.
-# This process will let us work on the real value factors
-# while still accounting the NA in an elegant manner.
-q20_team_dedication = q20_team_dedication[q20_team_dedication$X != team_dedication_na_value, ];
-
 # And let's have a quick look at the data
-knitr::kable(q20_team_dedication);
+knitr::kable(iamperf2020_q20_team_dedication);
 
 ```
 
@@ -132,29 +99,10 @@ It's now time to prepare our survey data and look at it.
 # In the original survey data, every domain has one corresponding column.
 # They are easily recognizable because they are prefixed by Q20R followed
 # by an integer value.
-interesting_columns = paste(question_prefix, 1:domains_count, sep = "");
-
-# Prepare a data.frame with only those columns we are interested in.
-question_data = survey_data[,interesting_columns];
-
-# Here we are, substitute 5 with NA.
-question_data$Q20R1 = ifelse(question_data$Q20R1 == 5, NA, question_data$Q20R1);
-question_data$Q20R2 = ifelse(question_data$Q20R2 == 5, NA, question_data$Q20R2);
-question_data$Q20R3 = ifelse(question_data$Q20R3 == 5, NA, question_data$Q20R3);
-question_data$Q20R4 = ifelse(question_data$Q20R4 == 5, NA, question_data$Q20R4);
-question_data$Q20R5 = ifelse(question_data$Q20R5 == 5, NA, question_data$Q20R5);
-question_data$Q20R6 = ifelse(question_data$Q20R6 == 5, NA, question_data$Q20R6);
-
-# Apply nicely labeled and properly ordered factors.
-question_data$Q20R1 = factor(question_data$Q20R1, levels = q20_team_dedication$X, labels = q20_team_dedication$Title, ordered = TRUE, exclude = NA);
-question_data$Q20R2 = factor(question_data$Q20R2, levels = q20_team_dedication$X, labels = q20_team_dedication$Title, ordered = TRUE, exclude = NA);
-question_data$Q20R3 = factor(question_data$Q20R3, levels = q20_team_dedication$X, labels = q20_team_dedication$Title, ordered = TRUE, exclude = NA);
-question_data$Q20R4 = factor(question_data$Q20R4, levels = q20_team_dedication$X, labels = q20_team_dedication$Title, ordered = TRUE, exclude = NA);
-question_data$Q20R5 = factor(question_data$Q20R5, levels = q20_team_dedication$X, labels = q20_team_dedication$Title, ordered = TRUE, exclude = NA);
-question_data$Q20R6 = factor(question_data$Q20R6, levels = q20_team_dedication$X, labels = q20_team_dedication$Title, ordered = TRUE, exclude = NA);
+interesting_columns = paste("Q20R", 1:domains_count, sep = "");
 
 # And let's have a quick look at the top records in our dataset.
-knitr::kable(dplyr::sample_n(question_data, 10));
+knitr::kable(dplyr::sample_n(iamperf2020_survey[,interesting_columns], 10));
 
 ```
 
@@ -167,16 +115,16 @@ We have a lot of dropouts in surveys, especially at the beginning of the survey.
 ```{r}
 
 # Count the number of survey answers.
-n = nrow(question_data);
+n = nrow(iamperf2020_survey);
 
 # I count as unanswered those rows where all categorical values are NA.
-na_per_row = colSums(apply(question_data[,interesting_columns], 1, is.na));
+na_per_row = colSums(apply(iamperf2020_survey[,interesting_columns], 1, is.na));
 answer_status_per_row = ifelse(
   na_per_row == 6,
   "Unanswered",
   "Answered");
-answered = nrow(question_data[answer_status_per_row == "Answered",]);
-unanswered = nrow(question_data[answer_status_per_row == "Unanswered",]);
+answered = nrow(iamperf2020_survey[answer_status_per_row == "Answered",]);
+unanswered = nrow(iamperf2020_survey[answer_status_per_row == "Unanswered",]);
 
 # Prepare a legend to inform on the sample size and answer rate.
 legend_block = paste(
@@ -196,9 +144,9 @@ We have 3 dimensions in our data: participants, domains and team dedication. Dat
 ```{r}
 
 # Re-set the column names to the long titles to get proper labels on the graph.
-colnames(question_data) = q20_domains$Title;
+colnames(iamperf2020_survey[,interesting_columns]) = iamperf2020_q20_domains$Title;
 
-likert_data = likert::likert(question_data);
+likert_data = likert::likert(iamperf2020_survey[,interesting_columns]);
 
 likert_colors = c("#ff9955", "#dddddd", "#5599ff");
 

@@ -55,27 +55,53 @@ if(!require("devtools")) install.packages("devtools");
 
 ```
 
-Some will notice I don't load libraries. Instead, I prefer to use the unambiguous syntax *package::function*. This makes the code slightly harsher to read but this is a price I am pleased to pay. 
-
-## Loading complementary scripts from Github
-# 
+## Loading the IAMPerf2020 data environment
 
 ```{r}
-devtools::source_url("https://github.com/tonybreyal/Blog-Reference-Functions/blob/master/R/bingSearchXScraper/bingSearchXScraper.R?raw=TRUE")
+devtools::source_url("https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/IAMPerf2020Setup.R?raw=TRUE")
 ```
 
-
-## Retrieving the data
-
-Then we need to load our survey data. In accordance with the *Open Source* and *Open Data* spirit of the *Open-Measure* project, all data is publicly available on GitHub. Isn't that extremely cool, hm?
+## Devices
 
 ```{r}
 
+summarize_devices = function(survey_data){
+  all_surveys_devices = table(survey_data$Device);
+  completed_surveys_devices = table(survey_data[survey_data$ResponseStatus == "Completed",]$Device);
+  
+  plot_data = data.frame(
+    fill = c(names(all_surveys_devices), names(completed_surveys_devices)),
+    y = c(all_surveys_devices, completed_surveys_devices),
+    x = c(rep("All surveys", 3), rep("Completed surveys", 3))
+  );
+  
+  label_percent = c(
+    paste(rounded_ratios_with_largest_remainder(all_surveys_devices, 100, 2), "%", sep = ""),
+    paste(rounded_ratios_with_largest_remainder(completed_surveys_devices, 100, 2), "%", sep = "")
+    );
+  label_absolute = paste("(", plot_data$y, ")", sep = "");
+  label = paste(label_percent, label_absolute, sep = "\n");
+  plot_data$label = label;
 
+  return(plot_data);  
+};
 
-
+# Stacked + percent
+ggplot2::ggplot(
+  summarize_devices(iamperf2020_survey), 
+  ggplot2::aes(fill=fill, y=y, x= x, label = label)
+  ) + 
+  ggplot2::geom_bar(position="fill", stat="identity") +
+  ggplot2::geom_text(size = 3, position = ggplot2::position_fill(vjust = 0.5)) + 
+  ggplot2::xlab("Survey sets") +
+  ggplot2::scale_x_discrete (limits = c("All surveys", "Completed surveys")) +
+  ggplot2::scale_y_continuous (name = "%") +
+  ggplot2::scale_fill_brewer(palette = "Paired") +
+  ggplot2::labs(title = "Devices", subtitle = "The device category used by survey participants", fill = "Device");
 
 ```
+
+
 
 
 # References
@@ -83,3 +109,4 @@ Then we need to load our survey data. In accordance with the *Open Source* and *
 I list here a bunch of articles that have been inspiring or helpful while writing this notebook.
 
  * https://stackoverflow.com/questions/35720660/how-to-use-an-r-script-from-github
+ 
