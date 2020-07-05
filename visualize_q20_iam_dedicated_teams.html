@@ -391,7 +391,7 @@ summary {
 </center>
 <div id="in-a-nutshell" class="section level2">
 <h2>In a nutshell</h2>
-<p>In this R notebook, I analyse survey data related to whether Identity and Access Management (IAM) teams are predominantly shared or dedicated in organizations. The likert chart visualization method is used to display the data.</p>
+<p>In this R notebook, I analyse survey data related to whether Identity and Access Management (IAM) teams are predominantly shared or dedicated in organizations, split by IAM sub-domains of activity and for IAM as a whole. A likert chart is used to display the data.</p>
 </div>
 <div id="introduction" class="section level2">
 <h2>Introduction</h2>
@@ -573,44 +573,60 @@ knitr::kable(dplyr::sample_n(question_data, 10));</code></pre>
 </thead>
 <tbody>
 <tr class="odd">
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+</tr>
+<tr class="even">
+<td align="left">NA</td>
+<td align="left">Predominantly shared</td>
+<td align="left">Predominantly shared</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">Predominantly shared</td>
+</tr>
+<tr class="odd">
+<td align="left">Predominantly shared</td>
 <td align="left">Predominantly dedicated</td>
-<td align="left">Predominantly dedicated</td>
+<td align="left">Predominantly shared</td>
+<td align="left">Predominantly shared</td>
+<td align="left">Predominantly shared</td>
+<td align="left">Predominantly shared</td>
+</tr>
+<tr class="even">
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+</tr>
+<tr class="odd">
 <td align="left">Predominantly dedicated</td>
 <td align="left">Predominantly dedicated</td>
 <td align="left">NA</td>
+<td align="left">Predominantly dedicated</td>
+<td align="left">Predominantly dedicated</td>
+<td align="left">Predominantly dedicated</td>
+</tr>
+<tr class="even">
 <td align="left">Balanced</td>
-</tr>
-<tr class="even">
-<td align="left">Predominantly dedicated</td>
-<td align="left">Predominantly dedicated</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">Predominantly dedicated</td>
+<td align="left">Predominantly shared</td>
+<td align="left">Balanced</td>
+<td align="left">Balanced</td>
+<td align="left">Balanced</td>
+<td align="left">Predominantly shared</td>
 </tr>
 <tr class="odd">
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-</tr>
-<tr class="even">
+<td align="left">Predominantly dedicated</td>
 <td align="left">Predominantly dedicated</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
-<td align="left">NA</td>
 <td align="left">Predominantly dedicated</td>
-</tr>
-<tr class="odd">
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
 </tr>
 <tr class="even">
 <td align="left">Predominantly dedicated</td>
@@ -621,26 +637,10 @@ knitr::kable(dplyr::sample_n(question_data, 10));</code></pre>
 <td align="left">Predominantly dedicated</td>
 </tr>
 <tr class="odd">
+<td align="left">Predominantly dedicated</td>
+<td align="left">Predominantly dedicated</td>
 <td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-</tr>
-<tr class="even">
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-</tr>
-<tr class="odd">
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
+<td align="left">Predominantly dedicated</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
 </tr>

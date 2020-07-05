@@ -9,7 +9,7 @@ output:
 ---
 
 <center> *David Doret* </center>
-<center> *Version 1.3* </center>
+<center> *Version 1.4* </center>
 <center> *May 2020, updated June 2020* </center>
 
 ## In a nutshell
