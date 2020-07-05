@@ -61,23 +61,29 @@ if(!require("devtools")) install.packages("devtools");
 devtools::source_url("https://raw.githubusercontent.com/Open-Measure/Open-Data/master/IAMPerf2020-Dataset/IAMPerf2020Setup.R?raw=TRUE")
 ```
 
+# Demographics
+
+
+
+# Answers
+
 ## Devices
 
 ```{r}
 
-summarize_devices = function(survey_data){
-  all_surveys_devices = table(survey_data$Device);
-  completed_surveys_devices = table(survey_data[survey_data$ResponseStatus == "Completed",]$Device);
+get_device_plot_data = function(survey_data){
+  incomplete = table(survey_data[survey_data$ResponseStatus != "Complete",]$Device);
+  complete = table(survey_data[survey_data$ResponseStatus == "Complete",]$Device);
   
   plot_data = data.frame(
-    fill = c(names(all_surveys_devices), names(completed_surveys_devices)),
-    y = c(all_surveys_devices, completed_surveys_devices),
-    x = c(rep("All surveys", 3), rep("Completed surveys", 3))
+    fill = c(names(incomplete), names(complete)),
+    y = c(incomplete, complete),
+    x = c(rep("Incomplete", 3), rep("Complete", 3))
   );
   
   label_percent = c(
-    paste(rounded_ratios_with_largest_remainder(all_surveys_devices, 100, 2), "%", sep = ""),
-    paste(rounded_ratios_with_largest_remainder(completed_surveys_devices, 100, 2), "%", sep = "")
+    paste(rounded_ratios_with_largest_remainder(incomplete, 100, 2), "%", sep = ""),
+    paste(rounded_ratios_with_largest_remainder(complete, 100, 2), "%", sep = "")
     );
   label_absolute = paste("(", plot_data$y, ")", sep = "");
   label = paste(label_percent, label_absolute, sep = "\n");
@@ -88,19 +94,62 @@ summarize_devices = function(survey_data){
 
 # Stacked + percent
 ggplot2::ggplot(
-  summarize_devices(iamperf2020_survey), 
+  get_device_plot_data(iamperf2020_survey), 
   ggplot2::aes(fill=fill, y=y, x= x, label = label)
   ) + 
   ggplot2::geom_bar(position="fill", stat="identity") +
   ggplot2::geom_text(size = 3, position = ggplot2::position_fill(vjust = 0.5)) + 
-  ggplot2::xlab("Survey sets") +
-  ggplot2::scale_x_discrete (limits = c("All surveys", "Completed surveys")) +
+  ggplot2::xlab("Survey status") +
+  ggplot2::scale_x_discrete (limits = c("Incomplete", "Complete")) +
   ggplot2::scale_y_continuous (name = "%") +
   ggplot2::scale_fill_brewer(palette = "Paired") +
-  ggplot2::labs(title = "Devices", subtitle = "The device category used by survey participants", fill = "Device");
+  ggplot2::labs(title = "Participant devices", subtitle = "The device category used by survey participants", fill = "Device")
 
 ```
 
+# Survey Duration
+
+```{r}
+
+light_grey = "#dddddd";
+light_blue = "#5599ff";
+dark_blue = "#0066ff";
+
+get_timetaken_plot_data = function(survey_data){
+  
+  time_taken = data.frame(
+    x = iamperf2020_survey$ResponseStatus,
+    y = iamperf2020_survey$TimeTaken / 60,
+    fill = iamperf2020_survey$ResponseStatus
+  );
+
+};
+
+
+ggplot2::ggplot(
+  get_timetaken_plot_data(iamperf2020_survey), 
+  ggplot2::aes(x = x, y = y, fill = fill)) +
+  ggplot2::scale_fill_brewer(palette = "Paired") +
+  ggplot2::stat_boxplot(
+    width = 0.20,
+    size = 1.25,
+    geom = "errorbar") + 
+  ggplot2::geom_boxplot(
+    outlier.shape = NA,
+    lwd = 0.2,
+    fill = "#FFFFFF") + 
+  ggplot2::geom_jitter(
+    size = 3,
+    shape = 21,
+    #fill = light_blue,
+    colour = "#000000") +
+ ggplot2::xlab(label = "Survey status") +
+ ggplot2::ylab(label = "Survey duration (in minutes)") +
+ ggplot2::coord_flip() +
+ ggplot2::labs(title = "Survey Duration", subtitle = "The distribution of survey durations", fill = "Survey status")
+
+
+```
 
 
 
